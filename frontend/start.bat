@@ -1,0 +1,3 @@
+@echo off
+echo Starting KeyForge Frontend Dev Server on http://localhost:4200 ...
+call npm run ng -- serve --port 4200 --configuration development

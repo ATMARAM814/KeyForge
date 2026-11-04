@@ -1,0 +1,102 @@
+import { Routes } from '@angular/router';
+import { authGuard, guestGuard, adminGuard, homeGuard, providerGuard } from './core/guards/auth.guard';
+
+export const routes: Routes = [
+  {
+    path: 'login',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'register',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/register/register.component').then((m) => m.RegisterComponent),
+  },
+  {
+    path: '',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./layout/main-layout/main-layout.component').then((m) => m.MainLayoutComponent),
+    children: [
+      { path: '', pathMatch: 'full', canActivate: [homeGuard], children: [] },
+      {
+        path: 'marketplace',
+        loadComponent: () =>
+          import('./features/marketplace/marketplace.component').then((m) => m.MarketplaceComponent),
+      },
+      {
+        path: 'marketplace/subscribe/:id',
+        loadComponent: () =>
+          import('./features/marketplace/subscribe-page/subscribe-page.component').then(
+            (m) => m.SubscribePageComponent
+          ),
+      },
+      {
+        path: 'playground',
+        loadComponent: () =>
+          import('./features/marketplace/playground/playground.component').then((m) => m.PlaygroundComponent),
+      },
+      {
+        path: 'provider/services',
+        canActivate: [providerGuard],
+        loadComponent: () =>
+          import('./features/marketplace/provider-services/provider-services.component').then(
+            (m) => m.ProviderServicesComponent
+          ),
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      },
+      {
+        path: 'error-analytics',
+        loadComponent: () =>
+          import('./features/error-analytics/error-analytics.component').then(
+            (m) => m.ErrorAnalyticsComponent
+          ),
+      },
+      {
+        path: 'subscribed-keys',
+        loadComponent: () =>
+          import('./features/subscribed-keys/subscribed-keys.component').then(
+            (m) => m.SubscribedKeysComponent
+          ),
+      },
+      {
+        path: 'projects',
+        loadComponent: () =>
+          import('./features/projects/project-list/project-list.component').then(
+            (m) => m.ProjectListComponent
+          ),
+      },
+      {
+        path: 'projects/:projectId/keys',
+        loadComponent: () =>
+          import('./features/api-keys/api-key-list/api-key-list.component').then(
+            (m) => m.ApiKeyListComponent
+          ),
+      },
+      {
+        path: 'projects/:projectId/keys/:keyId/analytics',
+        loadComponent: () =>
+          import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent),
+      },
+      {
+        path: 'audit-log',
+        loadComponent: () =>
+          import('./features/audit-log/audit-log.component').then((m) => m.AuditLogComponent),
+      },
+      {
+        path: 'admin-console',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./features/admin-console/admin-console.component').then(
+            (m) => m.AdminConsoleComponent
+          ),
+      },
+    ],
+  },
+  { path: '**', redirectTo: 'marketplace' },
+];
