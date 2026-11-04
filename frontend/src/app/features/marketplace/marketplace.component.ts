@@ -69,7 +69,7 @@ import { UserModeService } from '../../core/services/user-mode.service';
             </div>
             <button mat-stroked-button class="kf-btn-playground-hdr" (click)="navigateToPlayground()">
               <mat-icon>terminal</mat-icon>
-              <span>Open Playground</span>
+              <span>API Testing Console</span>
             </button>
           </div>
         </div>
@@ -153,7 +153,7 @@ import { UserModeService } from '../../core/services/user-mode.service';
                 <div class="kf-hub-card__icon kf-hub-card__icon--emerald">
                   <mat-icon>terminal</mat-icon>
                 </div>
-                <h4>Interactive Sandbox Playground</h4>
+                <h4>API Testing Console</h4>
                 <p>Inspect payloads, test request headers, and simulate prompt responses before integrating into code.</p>
               </div>
 
@@ -173,7 +173,7 @@ import { UserModeService } from '../../core/services/user-mode.service';
               </button>
               <button mat-stroked-button class="kf-btn-secondary" (click)="navigateToPlayground()">
                 <mat-icon>terminal</mat-icon>
-                <span>Explore Playground</span>
+                <span>API Testing Console</span>
               </button>
             </div>
           </div>
@@ -260,7 +260,7 @@ import { UserModeService } from '../../core/services/user-mode.service';
                     (click)="testInPlayground(item)"
                   >
                     <mat-icon>terminal</mat-icon>
-                    <span>Playground</span>
+                    <span>Test in Console</span>
                   </button>
                 </div>
               </div>

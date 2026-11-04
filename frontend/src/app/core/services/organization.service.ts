@@ -39,8 +39,11 @@ export class OrganizationService {
     return this.http.post<Membership>(`${this.baseUrl}/${organizationId}/members`, request);
   }
 
-  getAuditLogs(organizationId: string, page = 0, size = 20): Observable<AuditLogPageResponse> {
-    const params = new HttpParams().set('page', page).set('size', size);
-    return this.http.get<AuditLogPageResponse>(`${this.baseUrl}/${organizationId}/audit-logs`, { params });
+  getAuditLogs(organizationId?: string | null, page = 0, size = 20): Observable<AuditLogPageResponse> {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (organizationId) {
+      params = params.set('organizationId', organizationId);
+    }
+    return this.http.get<AuditLogPageResponse>(`${environment.apiBaseUrl}/audit-logs`, { params });
   }
 }

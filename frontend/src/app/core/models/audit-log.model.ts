@@ -8,6 +8,7 @@ export interface AuditLogEntry {
   action: string;
   targetType: string;
   targetId: string;
+  details?: string;
   createdAt: string;
 }
 

@@ -49,24 +49,34 @@ export class MarketplaceService {
     return this.http.post<ApiKeyCreatedResponse>(`${this.baseUrl}/${serviceId}/subscribe`, request || {});
   }
 
-  invokeService(serviceId: string, apiKey: string, payload: any): Observable<ServiceInvocationResponse> {
+  invokeService(
+    serviceId: string,
+    apiKey: string,
+    payload: any,
+    endpoint?: string,
+    method = 'POST'
+  ): Observable<ServiceInvocationResponse> {
     const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
     return this.http.post<ServiceInvocationResponse>(
       `${this.baseUrl}/${serviceId}/invoke`,
-      { payload: payloadStr },
+      { payload: payloadStr, endpoint, method },
       { headers: { 'X-API-Key': apiKey } }
     );
   }
 
+  getMySubscribedKeys(): Observable<ApiKey[]> {
+    return this.http.get<ApiKey[]>(`${environment.apiBaseUrl}/marketplace/subscriptions/my-keys`);
+  }
+
   getProviderRateLimitRequests(): Observable<ApiKey[]> {
-    return this.http.get<ApiKey[]>(`${environment.apiBaseUrl}/marketplace/provider/rate-limit-requests`);
+    return this.http.get<ApiKey[]>(`${this.baseUrl}/provider/rate-limit-requests`);
   }
 
   approveRateLimitRequest(keyId: string): Observable<ApiKey> {
-    return this.http.post<ApiKey>(`${environment.apiBaseUrl}/marketplace/provider/rate-limit-requests/${keyId}/approve`, {});
+    return this.http.post<ApiKey>(`${this.baseUrl}/provider/rate-limit-requests/${keyId}/approve`, {});
   }
 
   rejectRateLimitRequest(keyId: string): Observable<ApiKey> {
-    return this.http.post<ApiKey>(`${environment.apiBaseUrl}/marketplace/provider/rate-limit-requests/${keyId}/reject`, {});
+    return this.http.post<ApiKey>(`${this.baseUrl}/provider/rate-limit-requests/${keyId}/reject`, {});
   }
 }

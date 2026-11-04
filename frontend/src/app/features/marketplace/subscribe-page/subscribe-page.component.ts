@@ -415,9 +415,12 @@ interface EndpointModelOption {
                         <span class="kf-step-badge">Step 3 of 3</span>
                       </div>
 
-                      <!-- Allowed Endpoints / Models -->
+                      <!-- Endpoints Offered by Provider -->
                       <div class="kf-form-item">
-                        <label class="kf-label">Allowed Endpoints & HTTP Methods</label>
+                        <label class="kf-label">Endpoints Offered by {{ service()?.providerName }}</label>
+                        <span class="kf-input-helper" style="margin-bottom: 8px;">
+                          By default, your key has access to all endpoints provided by this service. You can uncheck endpoints below to restrict this key (Principle of Least Privilege).
+                        </span>
                         <div class="kf-endpoints-list">
                           @for (ep of endpointOptions; track ep.endpoint) {
                             <div class="kf-ep-card">
@@ -560,11 +563,15 @@ interface EndpointModelOption {
 
                   <!-- Actions -->
                   <div class="kf-success-actions">
+                    <button mat-flat-button color="primary" class="kf-btn-test-console" (click)="goToTestingConsole()">
+                      <mat-icon>terminal</mat-icon>
+                      <span>Open in Testing Console</span>
+                    </button>
                     <button mat-stroked-button class="kf-btn-keys" (click)="goToSubscribedKeys()">
                       <mat-icon>vpn_key</mat-icon>
                       <span>View in My API Keys</span>
                     </button>
-                    <button mat-flat-button color="primary" class="kf-btn-done" (click)="goBack()">
+                    <button mat-button class="kf-btn-done" (click)="goBack()">
                       <span>Return to Marketplace</span>
                     </button>
                   </div>
@@ -1437,6 +1444,25 @@ export class SubscribePageComponent implements OnInit {
     this.marketplaceService.getServiceById(serviceId).subscribe({
       next: (item) => {
         this.service.set(item);
+        if (item.declaredEndpoints && item.declaredEndpoints.length > 0) {
+          this.endpointOptions = item.declaredEndpoints.map((ep) => ({
+            endpoint: ep.endpoint,
+            name: ep.name || ep.endpoint,
+            supportsWrite: ep.methods ? ep.methods.some((m) => m === 'POST' || m === 'PUT') : true,
+            readSelected: true,
+            writeSelected: true,
+          }));
+        } else {
+          this.endpointOptions = [
+            {
+              endpoint: item.endpointUrl || '/v1/chat/completions',
+              name: 'Primary Service Endpoint',
+              supportsWrite: true,
+              readSelected: true,
+              writeSelected: true,
+            },
+          ];
+        }
         const defLimit = item.defaultRateLimit || item.rateLimitPerMinute || 60;
         const maxLimit = item.maxRateLimit || Math.max(defLimit * 5, 1000);
         this.requestedRateLimit = Math.min(defLimit * 2, maxLimit);
@@ -1627,12 +1653,14 @@ export class SubscribePageComponent implements OnInit {
   }
 
   goBack(): void {
+    this.provisionedKey.set(null);
     this.router.navigate(['/marketplace']);
   }
 
-  goToPlayground(): void {
+  goToTestingConsole(): void {
     const s = this.service();
     const key = this.provisionedKey()?.fullKey;
+    this.provisionedKey.set(null);
     this.router.navigate(['/playground'], {
       queryParams: {
         serviceId: s?.id,
@@ -1641,7 +1669,12 @@ export class SubscribePageComponent implements OnInit {
     });
   }
 
+  goToPlayground(): void {
+    this.goToTestingConsole();
+  }
+
   goToSubscribedKeys(): void {
+    this.provisionedKey.set(null);
     this.router.navigate(['/subscribed-keys']);
   }
 

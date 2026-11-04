@@ -9,14 +9,10 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/**
- * Records who did what to an ApiKey (created / revoked so far). Written to
- * from ApiKeyService today. There is no read API exposed for this yet -
- * see AuditLogController TODO and the frontend audit-log page stub.
- */
 @Entity
 @Table(name = "audit_logs", indexes = {
-        @Index(name = "idx_audit_logs_org", columnList = "organization_id")
+        @Index(name = "idx_audit_logs_org", columnList = "organization_id"),
+        @Index(name = "idx_audit_logs_actor", columnList = "actor_user_id")
 })
 @Getter
 @Setter
@@ -38,7 +34,7 @@ public class AuditLog {
     @Column(name = "actor_email", nullable = false)
     private String actorEmail;
 
-    /** e.g. API_KEY_CREATED, API_KEY_REVOKED */
+    /** e.g. API_KEY_CREATED, API_KEY_REVOKED, SERVICE_PUBLISHED, etc. */
     @Column(nullable = false)
     private String action;
 
@@ -47,6 +43,9 @@ public class AuditLog {
 
     @Column(name = "target_id", nullable = false)
     private String targetId;
+
+    @Column(name = "details", length = 1000)
+    private String details;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

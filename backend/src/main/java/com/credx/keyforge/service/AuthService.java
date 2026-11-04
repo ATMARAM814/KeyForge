@@ -3,16 +3,10 @@ package com.credx.keyforge.service;
 import com.credx.keyforge.dto.auth.AuthResponse;
 import com.credx.keyforge.dto.auth.LoginRequest;
 import com.credx.keyforge.dto.auth.RegisterRequest;
-import com.credx.keyforge.entity.MembershipRole;
-import com.credx.keyforge.entity.Organization;
-import com.credx.keyforge.entity.OrganizationMembership;
-import com.credx.keyforge.entity.PlanTier;
-import com.credx.keyforge.entity.Role;
-import com.credx.keyforge.entity.ServiceCategory;
-import com.credx.keyforge.entity.ServiceListing;
-import com.credx.keyforge.entity.User;
+import com.credx.keyforge.entity.*;
 import com.credx.keyforge.exception.DuplicateResourceException;
 import com.credx.keyforge.exception.InvalidCredentialsException;
+import com.credx.keyforge.repository.AuditLogRepository;
 import com.credx.keyforge.repository.OrganizationMembershipRepository;
 import com.credx.keyforge.repository.OrganizationRepository;
 import com.credx.keyforge.repository.ServiceListingRepository;
@@ -35,6 +29,7 @@ public class AuthService {
     private final ServiceListingRepository serviceListingRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuditLogRepository auditLogRepository;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -67,7 +62,7 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        // Auto-create default organization for the new user in Supabase
+        // Auto-create default organization for the new user
         String orgName = (assignedRole == Role.PROVIDER && request.organizationName() != null && !request.organizationName().isBlank())
                 ? request.organizationName().trim()
                 : user.getFullName() + "'s Workspace";
@@ -91,6 +86,17 @@ public class AuthService {
                 .role(MembershipRole.OWNER)
                 .build();
         membershipRepository.save(membership);
+
+        // Record registration audit log
+        auditLogRepository.save(AuditLog.builder()
+                .organizationId(org.getId())
+                .actorUserId(user.getId())
+                .actorEmail(user.getEmail())
+                .action("USER_REGISTERED")
+                .targetType("USER")
+                .targetId(user.getId())
+                .details("Registered account with role " + assignedRole + " in workspace: " + orgName)
+                .build());
 
         // If registering as a Provider with a Base API Gateway URL, auto-publish their initial service listing
         if (assignedRole == Role.PROVIDER && request.baseApiUrl() != null && !request.baseApiUrl().isBlank()) {

@@ -11,7 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MarketplaceService } from '../../../core/services/marketplace.service';
-import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/marketplace.model';
+import { DeclaredEndpointPermission, ServiceInvocationResponse, ServiceListing } from '../../../core/models/marketplace.model';
 
 @Component({
   selector: 'kf-playground',
@@ -37,7 +37,7 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
           <mat-icon>arrow_back</mat-icon>
           <span>Back to Marketplace</span>
         </a>
-        <h1 class="kf-playground-title">API & Model Testing Playground</h1>
+        <h1 class="kf-playground-title">API Testing Console</h1>
         <p class="kf-playground-desc">
           Execute real-time requests against published AI models and APIs using your provisioned API credentials.
         </p>
@@ -69,13 +69,35 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
             </div>
           }
 
+          <div class="kf-endpoint-selector-row">
+            <mat-form-field appearance="outline" class="kf-method-field">
+              <mat-label>Method</mat-label>
+              <mat-select [(ngModel)]="selectedMethod">
+                <mat-option value="POST">POST</mat-option>
+                <mat-option value="GET">GET</mat-option>
+                <mat-option value="PUT">PUT</mat-option>
+                <mat-option value="DELETE">DELETE</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="kf-path-field">
+              <mat-label>Endpoint Route</mat-label>
+              <input
+                matInput
+                [(ngModel)]="selectedEndpoint"
+                placeholder="/v1/chat/completions"
+              />
+            </mat-form-field>
+          </div>
+
           <mat-form-field appearance="outline" class="kf-full-width">
             <mat-label>API Key (Header: X-API-Key)</mat-label>
             <input
               matInput
-              type="password"
               [(ngModel)]="apiKey"
-              placeholder="kf_live_... or kf_test_..."
+              type="password"
+              placeholder="kf_live_..."
+              autocomplete="off"
             />
             <mat-hint>Paste your key or subscribe from the marketplace to get one.</mat-hint>
           </mat-form-field>
@@ -84,7 +106,7 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
             <mat-label>Request Payload (JSON)</mat-label>
             <textarea
               matInput
-              rows="9"
+              rows="8"
               [(ngModel)]="payloadText"
               placeholder="{ 'prompt': '...' }"
               class="kf-code-font"
@@ -138,25 +160,30 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
               }
               <span class="kf-meta-chip">
                 <mat-icon>speed</mat-icon>
-                <span>Limit: {{ response()?.metrics?.['rateLimitRemaining'] }} / {{ response()?.metrics?.['rateLimitLimit'] }} left</span>
+                <span>Quota: {{ response()?.metrics?.['rateLimitRemaining'] }} / {{ response()?.metrics?.['rateLimitLimit'] }} left</span>
               </span>
             </div>
 
-            <!-- JSON Output View -->
-            <div class="kf-code-container">
-              <pre><code>{{ formattedResponse() }}</code></pre>
+            <!-- Formatted Response Code Block -->
+            <div class="kf-code-viewer">
+              <div class="kf-code-viewer__header">
+                <span>Response Body</span>
+                <button mat-icon-button (click)="copyResponse()" aria-label="Copy response">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </div>
+              <pre class="kf-code-block"><code>{{ formattedResponse() }}</code></pre>
             </div>
           } @else if (loading()) {
-            <div class="kf-response-empty">
+            <div class="kf-response-placeholder">
               <mat-spinner diameter="36"></mat-spinner>
-              <h4>Sending request through Gateway...</h4>
-              <p>Routing to provider upstream target...</p>
+              <p>Routing through KeyForge AI Gateway & running inference...</p>
             </div>
           } @else {
-            <div class="kf-response-empty">
-              <mat-icon class="kf-empty-icon">code</mat-icon>
-              <h4>No Response Generated Yet</h4>
-              <p>Choose an AI model, enter your API key, and click "Send Request" to test live execution.</p>
+            <div class="kf-response-placeholder">
+              <mat-icon class="kf-placeholder-icon">terminal</mat-icon>
+              <h3>Ready to test</h3>
+              <p>Configure your service, enter your provisioned API key, and click <strong>Send Request</strong> to see live output.</p>
             </div>
           }
         </mat-card>
@@ -165,26 +192,24 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
   `,
   styles: [`
     .kf-playground-page {
-      padding: 32px 36px;
-      max-width: 1400px;
+      padding: 24px 32px;
+      max-width: 1300px;
       margin: 0 auto;
-      background: #f8fafc;
-      min-height: calc(100vh - 86px);
-      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
     .kf-playground-header {
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .kf-back-link {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: 13.5px;
-      font-weight: 600;
+      gap: 4px;
       color: #4f46e5;
       text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
       margin-bottom: 12px;
     }
 
@@ -193,16 +218,16 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
     }
 
     .kf-back-link mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
     .kf-playground-title {
       font-size: 26px;
       font-weight: 800;
       color: #0f172a;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.5px;
       margin: 0 0 6px 0;
     }
 
@@ -219,26 +244,25 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
       align-items: start;
     }
 
-    @media (max-width: 992px) {
+    @media (max-width: 900px) {
       .kf-playground-grid {
         grid-template-columns: 1fr;
       }
     }
 
     .kf-panel {
-      background: #ffffff !important;
-      border: 1px solid #e2e8f0 !important;
-      border-radius: 14px !important;
-      padding: 24px !important;
-      color: #0f172a !important;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+      padding: 24px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
     .kf-panel-title {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       color: #0f172a;
       margin-bottom: 20px;
@@ -255,58 +279,68 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
 
     .kf-full-width {
       width: 100%;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
+    }
+
+    .kf-endpoint-selector-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .kf-method-field {
+      width: 120px;
+    }
+
+    .kf-path-field {
+      flex: 1;
     }
 
     .kf-service-pill {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: #f1f5f9;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       padding: 8px 12px;
       border-radius: 8px;
-      margin-bottom: 18px;
-      border: 1px solid #e2e8f0;
+      margin-bottom: 16px;
     }
 
     .kf-pill-badge {
-      background: #eef2ff;
-      color: #4f46e5;
       font-size: 11px;
       font-weight: 700;
+      color: #4f46e5;
+      background: #eef2ff;
       padding: 2px 8px;
       border-radius: 4px;
-      border: 1px solid #c7d2fe;
     }
 
     .kf-service-pill code {
       font-size: 12px;
-      color: #0f172a;
+      color: #475569;
       font-family: monospace;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-weight: 600;
     }
 
     .kf-code-font {
-      font-family: 'JetBrains Mono', 'Roboto Mono', monospace !important;
-      font-size: 12.5px !important;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .kf-request-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
     }
 
     .kf-execute-btn {
-      width: 100%;
-      height: 46px;
-      font-weight: 700;
-      font-size: 14px;
-      background: #4f46e5 !important;
-      color: #ffffff !important;
-      border-radius: 8px;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      letter-spacing: -0.01em;
+      height: 42px;
+      padding: 0 20px;
+      font-size: 13.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .kf-response-meta {
@@ -319,82 +353,91 @@ import { ServiceInvocationResponse, ServiceListing } from '../../../core/models/
     .kf-meta-chip {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 5px 12px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
+      gap: 6px;
+      background: #f1f5f9;
+      color: #334155;
       font-size: 12px;
       font-weight: 600;
-      color: #475569;
+      padding: 4px 10px;
+      border-radius: 6px;
     }
 
     .kf-meta-chip mat-icon {
-      font-size: 15px;
-      width: 15px;
-      height: 15px;
-      color: #6366f1;
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #64748b;
     }
 
     .kf-meta-chip--status {
       background: #ecfdf5;
-      border-color: #a7f3d0;
-      color: #059669;
+      color: #065f46;
     }
 
     .kf-meta-chip--status mat-icon {
-      color: #059669;
+      color: #10b981;
     }
 
-    .kf-code-container {
-      background: #0f172a;
+    .kf-code-viewer {
       border: 1px solid #1e293b;
-      border-radius: 10px;
-      padding: 16px;
-      max-height: 460px;
-      overflow: auto;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0f172a;
     }
 
-    .kf-code-container pre {
+    .kf-code-viewer__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .kf-code-viewer__header button {
+      color: #94a3b8;
+      width: 28px;
+      height: 28px;
+    }
+
+    .kf-code-block {
       margin: 0;
-    }
-
-    .kf-code-container code {
-      font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-      font-size: 12.5px;
+      padding: 16px;
       color: #38bdf8;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12.5px;
       line-height: 1.5;
+      max-height: 400px;
+      overflow-y: auto;
     }
 
-    .kf-response-empty {
+    .kf-response-placeholder {
+      padding: 60px 20px;
       text-align: center;
-      padding: 64px 20px;
       color: #64748b;
     }
 
-    .kf-response-empty mat-spinner {
-      margin: 0 auto 16px auto;
-    }
-
-    .kf-empty-icon {
-      font-size: 44px;
-      width: 44px;
-      height: 44px;
+    .kf-placeholder-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
       color: #cbd5e1;
       margin-bottom: 12px;
     }
 
-    .kf-response-empty h4 {
+    .kf-response-placeholder h3 {
       font-size: 16px;
       font-weight: 700;
-      color: #1e293b;
+      color: #334155;
       margin: 0 0 6px 0;
     }
 
-    .kf-response-empty p {
-      font-size: 13.5px;
-      color: #64748b;
-      margin: 0;
+    .kf-response-placeholder p {
+      font-size: 13px;
+      max-width: 320px;
+      margin: 0 auto;
     }
   `],
 })
@@ -409,10 +452,17 @@ export class PlaygroundComponent implements OnInit {
   loading = signal(false);
 
   selectedServiceId: string | null = null;
+  selectedEndpoint = '/v1/chat/completions';
+  selectedMethod = 'POST';
   apiKey = '';
   payloadText = '{}';
 
   ngOnInit(): void {
+    const queryKey = this.route.snapshot.queryParamMap.get('key') || this.route.snapshot.queryParamMap.get('apiKey');
+    if (queryKey) {
+      this.apiKey = queryKey;
+    }
+
     this.marketplaceService.listServices().subscribe({
       next: (data) => {
         this.services.set(data);
@@ -430,10 +480,19 @@ export class PlaygroundComponent implements OnInit {
   onServiceChange(): void {
     const svc = this.services().find((s) => s.id === this.selectedServiceId) ?? null;
     this.currentService.set(svc);
-    if (svc && svc.samplePayload) {
-      this.payloadText = svc.samplePayload;
-    } else {
-      this.payloadText = '{\n  "prompt": "Hello world"\n}';
+    if (svc) {
+      if (svc.declaredEndpoints && svc.declaredEndpoints.length > 0) {
+        this.selectedEndpoint = svc.declaredEndpoints[0].endpoint;
+        this.selectedMethod = svc.declaredEndpoints[0].methods?.[0] || 'POST';
+      } else if (svc.endpointUrl) {
+        this.selectedEndpoint = svc.endpointUrl;
+      }
+
+      if (svc.samplePayload) {
+        this.payloadText = svc.samplePayload;
+      } else {
+        this.payloadText = '{\n  "prompt": "Hello world"\n}';
+      }
     }
     this.response.set(null);
   }
@@ -448,7 +507,13 @@ export class PlaygroundComponent implements OnInit {
     this.response.set(null);
 
     this.marketplaceService
-      .invokeService(this.selectedServiceId, this.apiKey.trim(), this.payloadText)
+      .invokeService(
+        this.selectedServiceId,
+        this.apiKey.trim(),
+        this.payloadText,
+        this.selectedEndpoint.trim(),
+        this.selectedMethod
+      )
       .subscribe({
         next: (res) => {
           this.response.set(res);
@@ -460,6 +525,14 @@ export class PlaygroundComponent implements OnInit {
           this.snackBar.open(msg, 'Dismiss', { duration: 4000 });
         },
       });
+  }
+
+  copyResponse(): void {
+    const res = this.response();
+    if (!res) return;
+    navigator.clipboard.writeText(JSON.stringify(res.responseData, null, 2)).then(() => {
+      this.snackBar.open('Response copied to clipboard', undefined, { duration: 2000 });
+    });
   }
 
   formattedResponse(): string {

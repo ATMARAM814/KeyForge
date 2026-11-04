@@ -62,7 +62,7 @@ public class ApiKeyService {
                 .build();
         apiKey = apiKeyRepository.save(apiKey);
 
-        writeAuditLog(organizationId, "API_KEY_CREATED", apiKey.getId());
+        writeAuditLog(organizationId, "API_KEY_CREATED", apiKey.getId(), "Created API key: " + apiKey.getName());
 
         return new ApiKeyCreatedResponse(toResponse(apiKey), generated.fullKey());
     }
@@ -81,17 +81,12 @@ public class ApiKeyService {
             throw new ResourceNotFoundException("Project not found");
         }
 
-        Page<ApiKey> page = apiKeyRepository.findAllByProjectId(projectId, pageable);
-        // NOTE: toResponse() below reaches into apiKey.getProject().getName() for
-        // each row. Project is a LAZY association, so for a page of N keys this
-        // fires one extra SELECT per row on top of the page query itself.
-        return page.map(this::toResponse);
+        return apiKeyRepository.findAllByProjectIdOrderByCreatedAtDesc(projectId, pageable)
+                .map(this::toResponse);
     }
 
     /**
-     * Fetches a single API key by id. Used by the key detail view and by the
-     * revoke action to confirm what's being revoked before showing a
-     * confirmation dialog.
+     * Look up a single API key by ID.
      */
     @Transactional(readOnly = true)
     public ApiKeyResponse getApiKey(String userId, String apiKeyId) {
@@ -116,45 +111,35 @@ public class ApiKeyService {
         apiKey.setRevokedAt(Instant.now());
         apiKeyRepository.save(apiKey);
 
-        writeAuditLog(orgId, "API_KEY_REVOKED", apiKey.getId());
+        writeAuditLog(orgId, "API_KEY_REVOKED", apiKey.getId(), "Revoked API key: " + apiKey.getName());
     }
 
-    /**
-     * @deprecated superseded by the paginated {@link #listApiKeys} above. Kept
-     * around because the CSV export job (ops script, not in this repo) still
-     * calls it directly for a full unpaginated dump. Do not use for
-     * user-facing endpoints - loads every key for a project into memory.
-     */
     @Deprecated
     @Transactional(readOnly = true)
     public List<ApiKeyResponse> listAllApiKeysUnpaged(String projectId) {
-        return apiKeyRepository.findAllByProjectId(projectId).stream()
+        return apiKeyRepository.findAllByProjectIdOrderByCreatedAtDesc(projectId)
+                .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    /**
-     * Rotates an existing API key: generates a new key with identical configuration,
-     * while keeping the old key valid for a 24-hour grace period.
-     */
     @Transactional
-    public ApiKeyCreatedResponse rotateApiKey(String userId, String apiKeyId) {
-        ApiKey oldKey = apiKeyRepository.findById(apiKeyId)
+    public ApiKeyCreatedResponse rotateApiKey(String userId, String oldApiKeyId) {
+        ApiKey oldKey = apiKeyRepository.findById(oldApiKeyId)
                 .orElseThrow(() -> new ResourceNotFoundException("API key not found"));
 
-        String orgId = oldKey.getProject().getOrganization().getId();
-        accessService.requireRole(userId, orgId, MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MEMBER);
+        Project project = oldKey.getProject();
+        String orgId = project.getOrganization().getId();
+        accessService.requireRole(userId, orgId, MembershipRole.OWNER, MembershipRole.ADMIN);
 
-        if (oldKey.getStatus() != ApiKeyStatus.ACTIVE) {
-            throw new ForbiddenOperationException("Only active API keys can be rotated");
+        if (oldKey.getStatus() == ApiKeyStatus.REVOKED) {
+            throw new ForbiddenOperationException("Cannot rotate a revoked API key");
         }
 
-        // Keep old key valid for a 24-hour grace period
-        oldKey.setExpiresAt(Instant.now().plusSeconds(86400));
+        oldKey.setStatus(ApiKeyStatus.REVOKED);
+        oldKey.setRevokedAt(Instant.now());
         apiKeyRepository.save(oldKey);
 
-        // Generate new API key
-        Project project = oldKey.getProject();
         ApiKeyGenerator.GeneratedKey generated = apiKeyGenerator.generate(project.getEnvironment());
 
         ApiKey newKey = ApiKey.builder()
@@ -171,12 +156,12 @@ public class ApiKeyService {
                 .build();
         newKey = apiKeyRepository.save(newKey);
 
-        writeAuditLog(orgId, "API_KEY_ROTATED", newKey.getId());
+        writeAuditLog(orgId, "API_KEY_ROTATED", newKey.getId(), "Rotated API key: " + newKey.getName());
 
         return new ApiKeyCreatedResponse(toResponse(newKey), generated.fullKey());
     }
 
-    private void writeAuditLog(String organizationId, String action, String targetId) {
+    private void writeAuditLog(String organizationId, String action, String targetId, String details) {
         AuthenticatedUser actor = currentUserProvider.get();
         AuditLog log = AuditLog.builder()
                 .organizationId(organizationId)
@@ -185,6 +170,7 @@ public class ApiKeyService {
                 .action(action)
                 .targetType("API_KEY")
                 .targetId(targetId)
+                .details(details)
                 .build();
         auditLogRepository.save(log);
     }

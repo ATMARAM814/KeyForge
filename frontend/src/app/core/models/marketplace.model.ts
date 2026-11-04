@@ -6,6 +6,12 @@ export type ServiceCategory =
   | 'REST_API'
   | 'UTILITY';
 
+export interface DeclaredEndpointPermission {
+  endpoint: string;
+  methods: string[];
+  name?: string;
+}
+
 export interface ServiceListing {
   id: string;
   name: string;
@@ -29,6 +35,7 @@ export interface ServiceListing {
   maxRateLimit?: number;
   allowedScopes?: string;
   allowedModels?: string;
+  declaredEndpoints?: DeclaredEndpointPermission[];
 }
 
 export interface CreateServiceListingRequest {
@@ -48,6 +55,7 @@ export interface CreateServiceListingRequest {
   maxRateLimit?: number;
   allowedScopes?: string;
   allowedModels?: string;
+  declaredEndpoints?: DeclaredEndpointPermission[];
 }
 
 export interface ServiceInvocationResponse {
@@ -64,11 +72,6 @@ export interface ServiceInvocationResponse {
     serviceTier?: string;
     [key: string]: any;
   };
-}
-
-export interface DeclaredEndpointPermission {
-  endpoint: string;
-  methods: string[];
 }
 
 export interface DeclaredBaselineProfile {
@@ -110,10 +113,7 @@ export interface SubscribeServiceRequest {
   alertWebhookUrl?: string;
   riskAction?: 'ALERT_ONLY' | 'THROTTLE' | 'AUTO_SUSPEND';
   tags?: string;
-  // legacy backward-compatibility
   description?: string;
   rateLimitPerMinute?: number;
   allowedIps?: string;
 }
-
-

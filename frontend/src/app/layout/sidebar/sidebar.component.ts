@@ -30,7 +30,7 @@ import { UserModeService } from '../../core/services/user-mode.service';
 
         <a mat-list-item routerLink="/playground" routerLinkActive="kf-sidebar__item--active">
           <mat-icon matListItemIcon class="kf-nav-icon">terminal</mat-icon>
-          <span matListItemTitle>Model Playground</span>
+          <span matListItemTitle>API Testing Console</span>
         </a>
 
         <a mat-list-item routerLink="/subscribed-keys" routerLinkActive="kf-sidebar__item--active">

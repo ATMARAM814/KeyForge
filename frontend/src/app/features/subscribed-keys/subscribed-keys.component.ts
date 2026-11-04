@@ -85,15 +85,7 @@ import { MaskKeyPipe } from '../../shared/pipes/mask-key.pipe';
               <th mat-header-cell *matHeaderCellDef>API Key Credential</th>
               <td mat-cell *matCellDef="let key">
                 <div class="kf-key-token-cell">
-                  <code class="kf-key-code">{{ key.keyPrefix | maskKey }}</code>
-                  <button
-                    mat-icon-button
-                    class="kf-copy-btn"
-                    matTooltip="Copy key prefix"
-                    (click)="copyPrefix(key.keyPrefix)"
-                  >
-                    <mat-icon>content_copy</mat-icon>
-                  </button>
+                  <code class="kf-key-code" matTooltip="Secret key is hashed and hidden after generation for security">{{ key.keyPrefix | maskKey }}</code>
                 </div>
               </td>
             </ng-container>
@@ -144,7 +136,7 @@ import { MaskKeyPipe } from '../../shared/pipes/mask-key.pipe';
                     (click)="openInPlayground(key)"
                   >
                     <mat-icon>terminal</mat-icon>
-                    <span>Playground</span>
+                    <span>Test in Console</span>
                   </button>
 
                   @if (key.status === 'ACTIVE') {

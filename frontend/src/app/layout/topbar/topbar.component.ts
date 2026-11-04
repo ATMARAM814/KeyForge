@@ -36,12 +36,12 @@ import { UserModeService } from '../../core/services/user-mode.service';
             <span>Marketplace</span>
           </a>
 
-          <a class="kf-nav-item" (click)="navigatePlayground()">
+          <a class="kf-nav-item" (click)="navigateTestingConsole()">
             <mat-icon>terminal</mat-icon>
-            <span>Playground</span>
+            <span>API Testing Console</span>
           </a>
         } @else {
-          <a class="kf-nav-item" (click)="navigateHome()">
+          <a class="kf-nav-item" (click)="navigateProviderServices()">
             <mat-icon>inventory_2</mat-icon>
             <span>Provider Console</span>
           </a>
@@ -54,14 +54,14 @@ import { UserModeService } from '../../core/services/user-mode.service';
 
         <div class="kf-gateway-status-pill">
           <span class="kf-status-dot"></span>
-          <span>Engine: <strong>Operational</strong> (14ms)</span>
+          <span>Gateway: <strong>Operational</strong></span>
         </div>
       </div>
 
       @if (sessionState.organizations().length > 0) {
         <button mat-button [matMenuTriggerFor]="orgMenu" class="kf-topbar__org-switcher">
           <mat-icon>domain</mat-icon>
-          <span>{{ sessionState.currentOrganization()?.name ?? 'Organization' }}</span>
+          <span>{{ sessionState.currentOrganization()?.name ?? 'Workspace' }}</span>
           <mat-icon>arrow_drop_down</mat-icon>
         </button>
         <mat-menu #orgMenu="matMenu" class="kf-org-menu">
@@ -84,7 +84,7 @@ import { UserModeService } from '../../core/services/user-mode.service';
           <div class="kf-menu-email">{{ sessionState.currentUser()?.email }}</div>
           <div class="kf-menu-badge-wrap">
             <span class="kf-menu-role-tag" [class.kf-menu-role-tag--prov]="userModeService.isProvider()">
-              {{ sessionState.currentUser()?.role }}
+              {{ sessionState.currentUser()?.role === 'DEVELOPER' ? 'Developer / Consumer' : sessionState.currentUser()?.role }}
             </span>
           </div>
         </div>
@@ -97,7 +97,6 @@ import { UserModeService } from '../../core/services/user-mode.service';
     </mat-toolbar>
   `,
   styles: [`
-    /* Main Toolbar - Crisp Enterprise Light Theme */
     .kf-topbar {
       position: sticky;
       top: 0;
@@ -128,26 +127,25 @@ import { UserModeService } from '../../core/services/user-mode.service';
     .kf-topbar__brand {
       font-weight: 800;
       font-size: 20px;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.6px;
       color: #0f172a;
     }
 
     .kf-gateway-tag {
       font-size: 10px;
-      background: #eef2ff;
+      font-weight: 800;
       color: #4f46e5;
+      background: #eef2ff;
       border: 1px solid #c7d2fe;
       padding: 2px 6px;
       border-radius: 4px;
-      font-weight: 700;
       letter-spacing: 0.5px;
     }
 
     .kf-topbar__spacer {
-      flex: 1 1 auto;
+      flex: 1;
     }
 
-    /* Header Nav Links (Kong Style) */
     .kf-nav-links {
       display: flex;
       align-items: center;
@@ -156,15 +154,15 @@ import { UserModeService } from '../../core/services/user-mode.service';
     }
 
     .kf-nav-item {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 600;
       color: #475569;
       cursor: pointer;
       text-decoration: none;
-      padding: 6px 12px;
+      padding: 6px 10px;
       border-radius: 6px;
       transition: all 0.15s ease;
     }
@@ -175,57 +173,102 @@ import { UserModeService } from '../../core/services/user-mode.service';
     }
 
     .kf-nav-item mat-icon {
-      font-size: 17px;
-      width: 17px;
-      height: 17px;
-      color: #6366f1;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #64748b;
     }
 
     .kf-gateway-status-pill {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 6px;
-      background: #f0fdf4;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
-      font-size: 12px;
-      font-weight: 500;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       padding: 4px 10px;
-      border-radius: 9999px;
+      border-radius: 100px;
+      font-size: 12px;
+      color: #475569;
     }
 
     .kf-status-dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #16a34a;
-      box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
     }
 
     .kf-topbar__org-switcher {
-      color: #334155;
+      font-size: 13px;
       font-weight: 600;
-      font-size: 13.5px;
-      background: #f8fafc;
+      color: #334155;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      height: 38px;
+      border-radius: 6px;
+      height: 34px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kf-topbar__org-switcher mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #64748b;
     }
 
     .kf-topbar__org-plan {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #6366f1;
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 4px;
       margin-left: 8px;
-      font-size: 11px;
-      color: #64748b;
+      text-transform: uppercase;
     }
 
     .kf-topbar__avatar-btn {
       color: #475569;
     }
 
-    @media (max-width: 860px) {
-      .kf-nav-links {
-        display: none;
-      }
+    .kf-menu-profile {
+      padding: 12px 16px;
+      min-width: 200px;
+    }
+
+    .kf-menu-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .kf-menu-email {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .kf-menu-badge-wrap {
+      margin-top: 8px;
+    }
+
+    .kf-menu-role-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+
+    .kf-menu-role-tag--prov {
+      background: #ecfdf5;
+      color: #059669;
     }
   `],
 })
@@ -249,8 +292,12 @@ export class TopbarComponent {
     this.router.navigate(['/marketplace']);
   }
 
-  navigatePlayground(): void {
+  navigateTestingConsole(): void {
     this.router.navigate(['/playground']);
+  }
+
+  navigateProviderServices(): void {
+    this.router.navigate(['/provider/services']);
   }
 
   selectOrg(orgId: string): void {

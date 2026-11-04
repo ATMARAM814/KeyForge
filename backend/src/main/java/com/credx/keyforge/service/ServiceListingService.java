@@ -41,6 +41,7 @@ public class ServiceListingService {
     private final ApiKeyValidationService validationService;
     private final GatewayEnforcementService gatewayEnforcementService;
     private final UsageLoggingService usageLoggingService;
+    private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -48,34 +49,36 @@ public class ServiceListingService {
         boolean hasCategory = (category != null);
         boolean hasSearch = (search != null && !search.trim().isBlank());
 
-        List<ServiceListing> results;
         if (hasCategory && hasSearch) {
-            results = serviceRepository.searchByCategoryAndKeyword(category, search.trim());
+            return serviceRepository.findByCategoryAndSearch(category, search.trim()).stream()
+                    .map(ServiceListingResponse::from)
+                    .toList();
         } else if (hasCategory) {
-            results = serviceRepository.findAllByIsActiveTrueAndCategoryOrderByCreatedAtDesc(category);
+            return serviceRepository.findByCategoryAndIsActiveTrue(category).stream()
+                    .map(ServiceListingResponse::from)
+                    .toList();
         } else if (hasSearch) {
-            results = serviceRepository.searchByKeyword(search.trim());
+            return serviceRepository.search(search.trim()).stream()
+                    .map(ServiceListingResponse::from)
+                    .toList();
         } else {
-            results = serviceRepository.findAllByIsActiveTrueOrderByCreatedAtDesc();
+            return serviceRepository.findByIsActiveTrueOrderByCreatedAtDesc().stream()
+                    .map(ServiceListingResponse::from)
+                    .toList();
         }
-
-        return results.stream()
-                .map(ServiceListingResponse::from)
-                .toList();
     }
 
     @Transactional(readOnly = true)
     public ServiceListingResponse getServiceById(String id) {
-        ServiceListing listing = serviceRepository.findById(id)
+        ServiceListing service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Service listing not found: " + id));
-        return ServiceListingResponse.from(listing);
+        return ServiceListingResponse.from(service);
     }
 
     @Transactional(readOnly = true)
     public List<ServiceListingResponse> getMyServices() {
         AuthenticatedUser current = currentUserProvider.get();
-        return serviceRepository.findByProviderUserIdOrderByCreatedAtDesc(current.getUserId())
-                .stream()
+        return serviceRepository.findByProviderUserIdOrderByCreatedAtDesc(current.getUserId()).stream()
                 .map(ServiceListingResponse::from)
                 .toList();
     }
@@ -99,6 +102,13 @@ public class ServiceListingService {
                 ? request.maxRateLimit()
                 : Math.max(defRateLimit * 5, 1000);
 
+        String declaredEndpointsJson = null;
+        if (request.declaredEndpoints() != null && !request.declaredEndpoints().isEmpty()) {
+            try {
+                declaredEndpointsJson = objectMapper.writeValueAsString(request.declaredEndpoints());
+            } catch (Exception ignored) {}
+        }
+
         ServiceListing listing = ServiceListing.builder()
                 .name(request.name().trim())
                 .slug(slug)
@@ -120,9 +130,22 @@ public class ServiceListingService {
                 .maxRateLimit(maxRateLimit)
                 .allowedScopes(request.allowedScopes())
                 .allowedModels(request.allowedModels())
+                .declaredEndpoints(declaredEndpointsJson)
                 .build();
 
-        return ServiceListingResponse.from(serviceRepository.save(listing));
+        listing = serviceRepository.save(listing);
+
+        auditLogRepository.save(AuditLog.builder()
+                .organizationId("provider-org")
+                .actorUserId(current.getUserId())
+                .actorEmail(current.getEmail())
+                .action("SERVICE_PUBLISHED")
+                .targetType("SERVICE")
+                .targetId(listing.getId())
+                .details("Published service: " + listing.getName() + " (" + listing.getCategory() + ")")
+                .build());
+
+        return ServiceListingResponse.from(listing);
     }
 
     @Transactional
@@ -134,6 +157,17 @@ public class ServiceListingService {
         if (!current.getUserId().equals(listing.getProviderUserId()) && current.getRole() != Role.ADMIN) {
             throw new ForbiddenOperationException("You are not the provider of this service");
         }
+
+        auditLogRepository.save(AuditLog.builder()
+                .organizationId("provider-org")
+                .actorUserId(current.getUserId())
+                .actorEmail(current.getEmail())
+                .action("SERVICE_DELETED")
+                .targetType("SERVICE")
+                .targetId(listing.getId())
+                .details("Deleted service: " + listing.getName())
+                .build());
+
         serviceRepository.delete(listing);
     }
 
@@ -262,7 +296,6 @@ public class ServiceListingService {
                     .toList());
             scopes.removeIf(s -> !permittedScopeNames.contains(s.name()));
             if (scopes.isEmpty()) {
-                // If developer selected none or invalid, default to the first permitted
                 permittedScopeNames.stream()
                         .findFirst()
                         .ifPresent(name -> {
@@ -305,6 +338,16 @@ public class ServiceListingService {
                 .build();
         apiKey = apiKeyRepository.save(apiKey);
 
+        auditLogRepository.save(AuditLog.builder()
+                .organizationId(organization.getId())
+                .actorUserId(current.getUserId())
+                .actorEmail(current.getEmail())
+                .action("API_KEY_CREATED")
+                .targetType("API_KEY")
+                .targetId(apiKey.getId())
+                .details("Subscribed to " + service.getName() + " (" + targetEnv + ")")
+                .build());
+
         ApiKeyResponse response = ApiKeyResponse.from(apiKey);
         return new ApiKeyCreatedResponse(response, generated.fullKey());
     }
@@ -340,6 +383,16 @@ public class ServiceListingService {
             apiKey.setRateLimitPerMinute(apiKey.getRequestedRateLimit());
             apiKey.setRateLimitApprovalStatus("APPROVED");
             apiKeyRepository.save(apiKey);
+
+            auditLogRepository.save(AuditLog.builder()
+                    .organizationId(apiKey.getProject().getOrganization().getId())
+                    .actorUserId(current.getUserId())
+                    .actorEmail(current.getEmail())
+                    .action("RATE_LIMIT_APPROVED")
+                    .targetType("API_KEY")
+                    .targetId(apiKey.getId())
+                    .details("Approved rate limit increase to " + apiKey.getRateLimitPerMinute() + " req/min for key: " + apiKey.getName())
+                    .build());
         }
         return ApiKeyResponse.from(apiKey);
     }
@@ -357,11 +410,22 @@ public class ServiceListingService {
 
         apiKey.setRateLimitApprovalStatus("REJECTED");
         apiKeyRepository.save(apiKey);
+
+        auditLogRepository.save(AuditLog.builder()
+                .organizationId(apiKey.getProject().getOrganization().getId())
+                .actorUserId(current.getUserId())
+                .actorEmail(current.getEmail())
+                .action("RATE_LIMIT_REJECTED")
+                .targetType("API_KEY")
+                .targetId(apiKey.getId())
+                .details("Rejected rate limit increase for key: " + apiKey.getName())
+                .build());
+
         return ApiKeyResponse.from(apiKey);
     }
 
     /**
-     * Executes / tests a service in the Playground with an API key, enforcing full gateway policy.
+     * Executes / tests a service in the Testing Console with an API key, enforcing full gateway policy.
      */
     public ServiceInvocationResponse invokeService(
             String serviceId,
@@ -381,14 +445,21 @@ public class ServiceListingService {
 
         ApiKey apiKey = resolved.get();
 
-        // Gateway enforcement: rate limit, client restriction, endpoint, risk scoring, high-risk action
+        String targetPath = (request != null && request.endpoint() != null && !request.endpoint().isBlank())
+                ? request.endpoint()
+                : service.getEndpointUrl();
+        String httpMethod = (request != null && request.method() != null && !request.method().isBlank())
+                ? request.method().toUpperCase()
+                : "POST";
+
+        // Gateway enforcement: rate limit, client restriction, endpoint (provider & key), risk scoring, high-risk action
         GatewayEnforcementService.EnforcementResult enforcement = gatewayEnforcementService.enforce(
                 apiKey,
                 clientIp != null ? clientIp : "127.0.0.1",
                 origin != null ? origin : "http://localhost:4200",
                 null,
-                service.getEndpointUrl(),
-                "POST",
+                targetPath,
+                httpMethod,
                 region != null ? region : "US"
         );
 
@@ -400,13 +471,13 @@ public class ServiceListingService {
 
         usageLoggingService.recordUsage(
                 apiKey,
-                service.getEndpointUrl(),
-                "POST",
+                targetPath,
+                httpMethod,
                 200,
                 latency
         );
 
-        Object responseData = buildSimulatedResponse(service, request.payload());
+        Object responseData = buildSimulatedResponse(service, request != null ? request.payload() : null);
 
         Map<String, Object> metrics = Map.of(
                 "tokensUsed", (int) (Math.random() * 120) + 40,

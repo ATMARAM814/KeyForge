@@ -109,6 +109,13 @@ public class ServiceListing {
     @Column(name = "allowed_models", length = 1000)
     private String allowedModels;
 
+    /**
+     * JSON-serialized list of endpoints and methods declared by the Provider.
+     * e.g. [{"endpoint":"/v1/chat/completions","methods":["POST"]}]
+     */
+    @Column(name = "declared_endpoints", length = 3000)
+    private String declaredEndpoints;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

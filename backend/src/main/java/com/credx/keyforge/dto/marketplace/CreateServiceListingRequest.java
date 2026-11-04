@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 public record CreateServiceListingRequest(
         @NotBlank(message = "Service name is required")
         @Size(max = 100, message = "Name must be <= 100 characters")
@@ -33,6 +35,7 @@ public record CreateServiceListingRequest(
         Integer defaultRateLimit,
         Integer maxRateLimit,
         String allowedScopes,
-        String allowedModels
+        String allowedModels,
+        List<DeclaredEndpointPermission> declaredEndpoints
 ) {
 }

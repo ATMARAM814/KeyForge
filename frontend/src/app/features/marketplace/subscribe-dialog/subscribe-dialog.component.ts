@@ -436,7 +436,7 @@ export interface SubscribeDialogData {
           <div class="kf-revealed-actions">
             <button mat-stroked-button class="kf-action-btn" (click)="goToPlayground()">
               <mat-icon>terminal</mat-icon>
-              <span>Test in API Playground</span>
+              <span>Test in Testing Console</span>
             </button>
             <button mat-stroked-button class="kf-action-btn" (click)="goToSubscribedKeys()">
               <mat-icon>vpn_key</mat-icon>

@@ -1,27 +1,30 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MarketplaceService } from '../../../core/services/marketplace.service';
-import { ServiceCategory } from '../../../core/models/marketplace.model';
+import { DeclaredEndpointPermission, ServiceCategory } from '../../../core/models/marketplace.model';
 
 @Component({
   selector: 'kf-publish-service-dialog',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
+    MatIconModule,
     MatProgressSpinnerModule,
   ],
   template: `
@@ -42,7 +45,7 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
 
         <mat-form-field appearance="outline" class="kf-full-width">
           <mat-label>Category</mat-label>
-          <mat-select formControlName="category">
+          <mat-select formControlName="category" (selectionChange)="onCategoryChange($event.value)">
             <mat-option value="AI_LLM">AI & Large Language Model (LLM)</mat-option>
             <mat-option value="SPEECH">Speech & Audio Processing</mat-option>
             <mat-option value="COMPUTER_VISION">Computer Vision & OCR</mat-option>
@@ -53,8 +56,8 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="kf-full-width">
-          <mat-label>Endpoint URL</mat-label>
-          <input matInput formControlName="endpointUrl" placeholder="https://api.yourdomain.com/v1/..." />
+          <mat-label>Base Endpoint URL</mat-label>
+          <input matInput formControlName="endpointUrl" placeholder="https://api.yourdomain.com/v1" />
           @if (form.controls.endpointUrl.hasError('required') && form.controls.endpointUrl.touched) {
             <mat-error>Endpoint URL is required</mat-error>
           }
@@ -70,9 +73,52 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
           ></textarea>
         </mat-form-field>
 
+        <!-- Provider Declared Endpoints / Capabilities -->
+        <div class="kf-policy-section">
+          <div class="kf-section-header">
+            <span class="material-icons-outlined">alt_route</span>
+            <strong>Declared Service Endpoints & Routes</strong>
+          </div>
+          <p class="kf-section-sub">
+            Declare the exact endpoints your service provides. Developers will be able to select from this list when issuing their API keys.
+          </p>
+
+          <div class="kf-endpoints-list">
+            @for (ep of declaredEndpoints; track ep.endpoint; let i = $index) {
+              <div class="kf-endpoint-row">
+                <span class="kf-ep-method-badge">{{ ep.methods.join(', ') }}</span>
+                <code class="kf-ep-path">{{ ep.endpoint }}</code>
+                <button mat-icon-button type="button" color="warn" (click)="removeEndpoint(i)" aria-label="Remove endpoint">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="kf-add-ep-row">
+            <input
+              type="text"
+              class="kf-small-input"
+              [(ngModel)]="newEndpointPath"
+              [ngModelOptions]="{standalone: true}"
+              placeholder="/v1/new-endpoint"
+            />
+            <select class="kf-small-select" [(ngModel)]="newEndpointMethod" [ngModelOptions]="{standalone: true}">
+              <option value="POST">POST</option>
+              <option value="GET">GET</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            <button mat-stroked-button type="button" (click)="addEndpoint()">
+              <mat-icon>add</mat-icon>
+              <span>Add Endpoint</span>
+            </button>
+          </div>
+        </div>
+
         <div class="kf-form-row">
           <mat-form-field appearance="outline" class="kf-half-width">
-            <mat-label>Rate Limit (req/min)</mat-label>
+            <mat-label>Default Rate Limit (req/min)</mat-label>
             <input matInput type="number" formControlName="rateLimitPerMinute" />
           </mat-form-field>
 
@@ -96,31 +142,19 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
         <div class="kf-policy-section">
           <div class="kf-section-header">
             <span class="material-icons-outlined">gavel</span>
-            <strong>Provider Security Policy Template</strong>
+            <strong>Provider Security Policy Ceiling</strong>
           </div>
-          <p class="kf-section-sub">Defines the baseline constraints enforced on developer keys for this service.</p>
+          <p class="kf-section-sub">Defines the maximum limits developers can request for this service.</p>
 
           <div class="kf-form-row">
-            <mat-form-field appearance="outline" class="kf-half-width">
-              <mat-label>Default Rate Limit (req/min)</mat-label>
-              <input matInput type="number" formControlName="defaultRateLimit" />
-            </mat-form-field>
-
             <mat-form-field appearance="outline" class="kf-half-width">
               <mat-label>Max Rate Limit Ceiling (req/min)</mat-label>
               <input matInput type="number" formControlName="maxRateLimit" />
             </mat-form-field>
-          </div>
 
-          <div class="kf-form-row">
             <mat-form-field appearance="outline" class="kf-half-width">
               <mat-label>Maximum Expiry Window (Days)</mat-label>
               <input matInput type="number" formControlName="maxExpiryDays" />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="kf-half-width">
-              <mat-label>Allowed Scopes (Comma-separated)</mat-label>
-              <input matInput formControlName="allowedScopes" placeholder="READ_ANALYTICS,READ_PROJECTS" />
             </mat-form-field>
           </div>
 
@@ -180,11 +214,12 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
     }
 
     .kf-dialog-content {
-      padding-top: 16px !important;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      max-height: 70vh;
+      gap: 12px;
+      min-width: 520px;
+      max-width: 600px;
+      padding-top: 12px !important;
     }
 
     .kf-full-width {
@@ -202,11 +237,7 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
 
     .kf-code-font {
       font-family: monospace;
-      font-size: 12px;
-    }
-
-    .kf-dialog-actions {
-      padding: 16px 24px;
+      font-size: 13px;
     }
 
     .kf-policy-section {
@@ -214,16 +245,16 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       padding: 14px;
-      margin: 10px 0 16px 0;
+      margin-bottom: 8px;
     }
 
     .kf-section-header {
       display: flex;
       align-items: center;
       gap: 6px;
-      color: #0f172a;
-      font-size: 14px;
-      margin-bottom: 2px;
+      font-size: 13.5px;
+      color: #1e293b;
+      margin-bottom: 4px;
     }
 
     .kf-section-header span {
@@ -232,9 +263,66 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
     }
 
     .kf-section-sub {
-      color: #64748b;
       font-size: 12px;
-      margin: 0 0 12px 0;
+      color: #64748b;
+      margin: 0 0 10px 0;
+    }
+
+    .kf-endpoints-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .kf-endpoint-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    .kf-ep-method-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #4f46e5;
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .kf-ep-path {
+      font-size: 12.5px;
+      color: #0f172a;
+      flex: 1;
+      margin-left: 10px;
+    }
+
+    .kf-add-ep-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .kf-small-input {
+      flex: 1;
+      height: 34px;
+      padding: 0 8px;
+      font-size: 12.5px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+    }
+
+    .kf-small-select {
+      height: 34px;
+      padding: 0 8px;
+      font-size: 12.5px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
     }
 
     .kf-checkboxes-row {
@@ -252,6 +340,10 @@ import { ServiceCategory } from '../../../core/models/marketplace.model';
       color: #334155;
       cursor: pointer;
     }
+
+    .kf-dialog-actions {
+      padding: 12px 24px;
+    }
   `],
 })
 export class PublishServiceDialogComponent {
@@ -261,6 +353,15 @@ export class PublishServiceDialogComponent {
   private readonly snackBar = inject(MatSnackBar);
 
   loading = signal(false);
+
+  newEndpointPath = '';
+  newEndpointMethod = 'POST';
+
+  declaredEndpoints: DeclaredEndpointPermission[] = [
+    { endpoint: '/v1/chat/completions', methods: ['POST'] },
+    { endpoint: '/v1/embeddings', methods: ['POST'] },
+    { endpoint: '/v1/models', methods: ['GET'] },
+  ];
 
   form = this.fb.nonNullable.group({
     name: ['', [Validators.required]],
@@ -279,6 +380,57 @@ export class PublishServiceDialogComponent {
     documentation: [''],
   });
 
+  onCategoryChange(cat: ServiceCategory): void {
+    switch (cat) {
+      case 'AI_LLM':
+        this.declaredEndpoints = [
+          { endpoint: '/v1/chat/completions', methods: ['POST'] },
+          { endpoint: '/v1/embeddings', methods: ['POST'] },
+          { endpoint: '/v1/models', methods: ['GET'] },
+        ];
+        break;
+      case 'SPEECH':
+        this.declaredEndpoints = [
+          { endpoint: '/v1/audio/transcriptions', methods: ['POST'] },
+          { endpoint: '/v1/audio/speech', methods: ['POST'] },
+        ];
+        break;
+      case 'COMPUTER_VISION':
+        this.declaredEndpoints = [
+          { endpoint: '/v1/vision/detect', methods: ['POST'] },
+          { endpoint: '/v1/vision/ocr', methods: ['POST'] },
+        ];
+        break;
+      case 'NLP':
+        this.declaredEndpoints = [
+          { endpoint: '/v1/nlp/sentiment', methods: ['POST'] },
+          { endpoint: '/v1/nlp/entities', methods: ['POST'] },
+        ];
+        break;
+      default:
+        this.declaredEndpoints = [
+          { endpoint: '/v1/data', methods: ['GET', 'POST'] },
+          { endpoint: '/v1/health', methods: ['GET'] },
+        ];
+        break;
+    }
+  }
+
+  addEndpoint(): void {
+    if (!this.newEndpointPath.trim()) return;
+    let path = this.newEndpointPath.trim();
+    if (!path.startsWith('/')) path = '/' + path;
+    this.declaredEndpoints.push({
+      endpoint: path,
+      methods: [this.newEndpointMethod],
+    });
+    this.newEndpointPath = '';
+  }
+
+  removeEndpoint(index: number): void {
+    this.declaredEndpoints.splice(index, 1);
+  }
+
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -286,7 +438,10 @@ export class PublishServiceDialogComponent {
     }
 
     this.loading.set(true);
-    const val = this.form.getRawValue();
+    const val = {
+      ...this.form.getRawValue(),
+      declaredEndpoints: this.declaredEndpoints,
+    };
 
     this.marketplaceService.createService(val).subscribe({
       next: (created) => {

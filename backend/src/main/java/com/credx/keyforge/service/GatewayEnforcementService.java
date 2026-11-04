@@ -46,7 +46,7 @@ public class GatewayEnforcementService {
      * Executes end-to-end gateway policy enforcement:
      * 1. Status & Expiration
      * 2. IP / Origin / App ID restrictions
-     * 3. Endpoints & Scopes
+     * 3. Endpoints & Scopes (Two-tier: Provider capability check + Developer key check)
      * 4. Behavioral risk scoring (region, peak volume, off-hours)
      * 5. Configured high-risk action enforcement (AUTO_SUSPEND, THROTTLE, ALERT_ONLY)
      * 6. Rate-limit enforcement
@@ -111,7 +111,18 @@ public class GatewayEnforcementService {
             }
         }
 
-        // 3. Endpoints & Scopes Enforcement
+        // 3. Two-Tier Endpoints & Capabilities Enforcement
+        // Tier 1: Check if the Model Provider actually declared and offers this endpoint
+        if (apiKey.getServiceListing() != null && apiKey.getServiceListing().getDeclaredEndpoints() != null && !apiKey.getServiceListing().getDeclaredEndpoints().isBlank() && targetPath != null) {
+            boolean offeredByProvider = isEndpointPermitted(targetPath, httpMethod, apiKey.getServiceListing().getDeclaredEndpoints());
+            if (!offeredByProvider) {
+                return EnforcementResult.denied(404, "ENDPOINT_NOT_OFFERED",
+                        "The target endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "] is not offered by the model provider",
+                        70, List.of("Endpoint not offered by provider: " + httpMethod + " " + targetPath));
+            }
+        }
+
+        // Tier 2: Check if this Developer's Key was granted permission for this specific endpoint
         if (apiKey.getAllowedEndpoints() != null && !apiKey.getAllowedEndpoints().isBlank() && targetPath != null) {
             boolean endpointAllowed = isEndpointPermitted(targetPath, httpMethod, apiKey.getAllowedEndpoints());
             if (!endpointAllowed) {
