@@ -17,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Locale;
 
 @Service
@@ -30,6 +31,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuditLogRepository auditLogRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -122,6 +124,7 @@ public class AuthService {
                     .documentation("Production API gateway provisioned by " + orgName + ". Support: " + (request.supportEmail() != null ? request.supportEmail() : user.getEmail()))
                     .rateLimitPerMinute(rateLimit)
                     .pricingTier("Verified Provider")
+                    .declaredEndpoints(ServiceListingService.normalizeEndpointsWithMapper(objectMapper, null, category, request.baseApiUrl()))
                     .isActive(true)
                     .build();
             serviceListingRepository.save(initialListing);

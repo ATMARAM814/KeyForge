@@ -3,6 +3,7 @@ package com.credx.keyforge.service;
 import com.credx.keyforge.dto.apikey.ApiKeyCreatedResponse;
 import com.credx.keyforge.dto.apikey.ApiKeyResponse;
 import com.credx.keyforge.dto.marketplace.CreateServiceListingRequest;
+import com.credx.keyforge.dto.marketplace.DeclaredEndpointPermission;
 import com.credx.keyforge.dto.marketplace.ServiceInvocationRequest;
 import com.credx.keyforge.dto.marketplace.ServiceInvocationResponse;
 import com.credx.keyforge.dto.marketplace.ServiceListingResponse;
@@ -102,12 +103,7 @@ public class ServiceListingService {
                 ? request.maxRateLimit()
                 : Math.max(defRateLimit * 5, 1000);
 
-        String declaredEndpointsJson = null;
-        if (request.declaredEndpoints() != null && !request.declaredEndpoints().isEmpty()) {
-            try {
-                declaredEndpointsJson = objectMapper.writeValueAsString(request.declaredEndpoints());
-            } catch (Exception ignored) {}
-        }
+        String declaredEndpointsJson = normalizeEndpoints(request.declaredEndpoints(), request.category(), request.endpointUrl());
 
         ServiceListing listing = ServiceListing.builder()
                 .name(request.name().trim())
@@ -574,5 +570,64 @@ public class ServiceListingService {
                     "result", Map.of("processedAt", Instant.now().toString())
             );
         };
+    }
+
+    public String normalizeEndpoints(List<DeclaredEndpointPermission> endpoints, ServiceCategory category, String baseEndpointUrl) {
+        return normalizeEndpointsWithMapper(this.objectMapper, endpoints, category, baseEndpointUrl);
+    }
+
+    public static String normalizeEndpointsWithMapper(ObjectMapper objectMapper, List<DeclaredEndpointPermission> endpoints, ServiceCategory category, String baseEndpointUrl) {
+        List<DeclaredEndpointPermission> normalized = new ArrayList<>();
+
+        if (endpoints != null && !endpoints.isEmpty()) {
+            for (DeclaredEndpointPermission ep : endpoints) {
+                if (ep.endpoint() == null || ep.endpoint().isBlank()) continue;
+                String path = ep.endpoint().trim();
+                if (!path.startsWith("/")) path = "/" + path;
+
+                List<String> methods = new ArrayList<>();
+                if (ep.methods() != null && !ep.methods().isEmpty()) {
+                    for (String m : ep.methods()) {
+                        String clean = m.trim().toUpperCase();
+                        if (!methods.contains(clean)) methods.add(clean);
+                    }
+                }
+                // Automatically ensure GET is supported on all declared endpoints for reading & testing
+                if (!methods.contains("GET")) {
+                    methods.add(0, "GET");
+                }
+                if (methods.isEmpty() || (methods.size() == 1 && methods.contains("GET") && !path.contains("model"))) {
+                    if (!methods.contains("POST")) methods.add("POST");
+                }
+                normalized.add(new DeclaredEndpointPermission(path, methods));
+            }
+        }
+
+        // If no endpoints were provided, dynamically generate standard endpoints based on category
+        if (normalized.isEmpty()) {
+            if (category == ServiceCategory.AI_LLM) {
+                normalized.add(new DeclaredEndpointPermission("/v1/chat/completions", List.of("GET", "POST")));
+                normalized.add(new DeclaredEndpointPermission("/v1/embeddings", List.of("GET", "POST")));
+                normalized.add(new DeclaredEndpointPermission("/v1/models", List.of("GET")));
+            } else if (category == ServiceCategory.COMPUTER_VISION) {
+                normalized.add(new DeclaredEndpointPermission("/v1/vision/detect", List.of("GET", "POST")));
+                normalized.add(new DeclaredEndpointPermission("/v1/vision/ocr", List.of("GET", "POST")));
+            } else if (category == ServiceCategory.SPEECH) {
+                normalized.add(new DeclaredEndpointPermission("/v1/audio/transcriptions", List.of("GET", "POST")));
+                normalized.add(new DeclaredEndpointPermission("/v1/audio/speech", List.of("GET", "POST")));
+            } else if (category == ServiceCategory.NLP) {
+                normalized.add(new DeclaredEndpointPermission("/v1/nlp/sentiment", List.of("GET", "POST")));
+                normalized.add(new DeclaredEndpointPermission("/v1/nlp/entities", List.of("GET", "POST")));
+            } else {
+                normalized.add(new DeclaredEndpointPermission("/v1/data", List.of("GET", "POST")));
+                normalized.add(new DeclaredEndpointPermission("/v1/health", List.of("GET")));
+            }
+        }
+
+        try {
+            return objectMapper.writeValueAsString(normalized);
+        } catch (Exception e) {
+            return "[]";
+        }
     }
 }
