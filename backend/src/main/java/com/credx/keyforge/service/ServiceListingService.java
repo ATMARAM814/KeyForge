@@ -427,13 +427,15 @@ public class ServiceListingService {
     /**
      * Executes / tests a service in the Testing Console with an API key, enforcing full gateway policy.
      */
+    @Transactional
     public ServiceInvocationResponse invokeService(
             String serviceId,
             String apiKeyHeader,
             ServiceInvocationRequest request,
             String clientIp,
             String origin,
-            String region
+            String region,
+            String appId
     ) {
         ServiceListing service = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Service listing not found: " + serviceId));
@@ -457,10 +459,11 @@ public class ServiceListingService {
                 apiKey,
                 clientIp != null ? clientIp : "127.0.0.1",
                 origin != null ? origin : "http://localhost:4200",
-                null,
+                appId,
                 targetPath,
                 httpMethod,
-                region != null ? region : "US"
+                region != null ? region : "US",
+                true // isConsoleTest: enables interactive console testing without transport mismatch failure
         );
 
         if (!enforcement.allowed()) {

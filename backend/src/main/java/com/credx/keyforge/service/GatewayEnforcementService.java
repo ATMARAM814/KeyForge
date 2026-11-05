@@ -61,6 +61,20 @@ public class GatewayEnforcementService {
             String httpMethod,
             String observedRegion
     ) {
+        return enforce(apiKey, clientIp, origin, appId, targetPath, httpMethod, observedRegion, false);
+    }
+
+    @Transactional
+    public EnforcementResult enforce(
+            ApiKey apiKey,
+            String clientIp,
+            String origin,
+            String appId,
+            String targetPath,
+            String httpMethod,
+            String observedRegion,
+            boolean isConsoleTest
+    ) {
         Instant now = Instant.now();
         List<String> anomalies = new ArrayList<>();
 
@@ -88,24 +102,40 @@ public class GatewayEnforcementService {
                     if (!restrictionList.contains("0.0.0.0/0")) {
                         boolean ipMatches = isIpPermitted(clientIp, restrictionList);
                         if (!ipMatches) {
-                            return EnforcementResult.denied(403, "IP_RESTRICTION_VIOLATION",
-                                    "Client IP address (" + (clientIp != null ? clientIp : "unknown") + ") is not authorized by the key's IP allowlist",
-                                    80, List.of("Unauthorized IP address: " + clientIp));
+                            if (!isConsoleTest) {
+                                return EnforcementResult.denied(403, "IP_RESTRICTION_VIOLATION",
+                                        "Client IP address (" + (clientIp != null ? clientIp : "unknown") + ") is not authorized by the key's IP allowlist",
+                                        80, List.of("Unauthorized IP address: " + clientIp));
+                            } else {
+                                anomalies.add("Console testing: Server IP restriction (" + String.join(", ", restrictionList) + ") simulated for interactive test");
+                            }
                         }
                     }
                 } else if (clientType.equals("BROWSER")) {
                     boolean originMatches = isOriginPermitted(origin, restrictionList);
                     if (!originMatches) {
-                        return EnforcementResult.denied(403, "ORIGIN_RESTRICTION_VIOLATION",
-                                "Request origin (" + (origin != null ? origin : "empty") + ") is not authorized by the key's allowed origins",
-                                80, List.of("Unauthorized browser origin: " + origin));
+                        if (!isConsoleTest) {
+                            return EnforcementResult.denied(403, "ORIGIN_RESTRICTION_VIOLATION",
+                                    "Request origin (" + (origin != null ? origin : "empty") + ") is not authorized by the key's allowed origins",
+                                    80, List.of("Unauthorized browser origin: " + origin));
+                        } else {
+                            anomalies.add("Console testing: Browser Origin restriction (" + String.join(", ", restrictionList) + ") simulated for interactive test");
+                        }
                     }
                 } else if (clientType.equals("MOBILE")) {
-                    boolean appMatches = isAppIdPermitted(appId, restrictionList);
-                    if (!appMatches) {
+                    if (appId != null && !appId.isBlank()) {
+                        boolean appMatches = isAppIdPermitted(appId, restrictionList);
+                        if (!appMatches) {
+                            return EnforcementResult.denied(403, "APP_ID_RESTRICTION_VIOLATION",
+                                    "Application identifier (" + appId + ") is not authorized by the key's mobile restrictions",
+                                    80, List.of("Unauthorized mobile App ID: " + appId));
+                        }
+                    } else if (!isConsoleTest) {
                         return EnforcementResult.denied(403, "APP_ID_RESTRICTION_VIOLATION",
-                                "Application identifier (" + (appId != null ? appId : "empty") + ") is not authorized by the key's mobile restrictions",
+                                "Application identifier (empty) is not authorized by the key's mobile restrictions",
                                 80, List.of("Unauthorized mobile App ID: " + appId));
+                    } else {
+                        anomalies.add("Console testing: Mobile App ID restriction (" + String.join(", ", restrictionList) + ") simulated for interactive test");
                     }
                 }
             }

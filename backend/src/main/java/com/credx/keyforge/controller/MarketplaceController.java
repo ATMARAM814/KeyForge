@@ -92,7 +92,9 @@ public class MarketplaceController {
             @RequestHeader("X-API-Key") String apiKeyHeader,
             @RequestBody(required = false) ServiceInvocationRequest request,
             jakarta.servlet.http.HttpServletRequest servletRequest,
-            @RequestHeader(value = "X-Region", required = false) String regionHeader) {
+            @RequestHeader(value = "X-Region", required = false) String regionHeader,
+            @RequestHeader(value = "X-App-ID", required = false) String appIdHeader,
+            @RequestHeader(value = "X-Bundle-ID", required = false) String bundleIdHeader) {
         ServiceInvocationRequest req = request != null ? request : new ServiceInvocationRequest("{}");
         String clientIp = servletRequest.getHeader("X-Forwarded-For") != null
                 ? servletRequest.getHeader("X-Forwarded-For").split(",")[0].trim()
@@ -100,6 +102,7 @@ public class MarketplaceController {
         String origin = servletRequest.getHeader("Origin") != null
                 ? servletRequest.getHeader("Origin")
                 : servletRequest.getHeader("Referer");
-        return ResponseEntity.ok(serviceListingService.invokeService(id, apiKeyHeader, req, clientIp, origin, regionHeader));
+        String appId = appIdHeader != null && !appIdHeader.isBlank() ? appIdHeader : bundleIdHeader;
+        return ResponseEntity.ok(serviceListingService.invokeService(id, apiKeyHeader, req, clientIp, origin, regionHeader, appId));
     }
 }
