@@ -163,9 +163,9 @@ import { DeclaredEndpointPermission, ServiceInvocationResponse, ServiceListing }
           @if (response()) {
             <!-- Metrics Row -->
             <div class="kf-response-meta">
-              <span class="kf-meta-chip kf-meta-chip--status">
-                <mat-icon>check_circle</mat-icon>
-                <span>{{ response()?.statusCode }} OK</span>
+              <span class="kf-meta-chip" [class.kf-meta-chip--status]="isSuccessStatus(response()?.statusCode)" [class.kf-meta-chip--error]="isErrorStatus(response()?.statusCode)">
+                <mat-icon>{{ getStatusIcon(response()?.statusCode) }}</mat-icon>
+                <span>{{ getStatusLabel(response()?.statusCode) }}</span>
               </span>
               <span class="kf-meta-chip">
                 <mat-icon>timer</mat-icon>
@@ -177,10 +177,18 @@ import { DeclaredEndpointPermission, ServiceInvocationResponse, ServiceListing }
                   <span>{{ response()?.metrics?.['tokensUsed'] }} tokens</span>
                 </span>
               }
-              <span class="kf-meta-chip">
-                <mat-icon>speed</mat-icon>
-                <span>Quota: {{ response()?.metrics?.['rateLimitRemaining'] }} / {{ response()?.metrics?.['rateLimitLimit'] }} left</span>
-              </span>
+              @if (response()?.metrics?.['rateLimitLimit']) {
+                <span class="kf-meta-chip">
+                  <mat-icon>speed</mat-icon>
+                  <span>Quota: {{ response()?.metrics?.['rateLimitRemaining'] ?? 0 }} / {{ response()?.metrics?.['rateLimitLimit'] }} left</span>
+                </span>
+              }
+              @if (response()?.metrics?.['error']) {
+                <span class="kf-meta-chip kf-meta-chip--error">
+                  <mat-icon>gpp_bad</mat-icon>
+                  <span>{{ response()?.metrics?.['error'] }}</span>
+                </span>
+              }
             </div>
 
             <!-- Formatted Response Code Block -->
@@ -462,6 +470,26 @@ import { DeclaredEndpointPermission, ServiceInvocationResponse, ServiceListing }
       color: #10b981;
     }
 
+    .kf-meta-chip--error {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .kf-meta-chip--error mat-icon {
+      color: #ef4444;
+    }
+
+    .kf-meta-chip--warning {
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .kf-meta-chip--warning mat-icon {
+      color: #f59e0b;
+    }
+
     .kf-code-viewer {
       border: 1px solid #1e293b;
       border-radius: 8px;
@@ -617,6 +645,7 @@ export class PlaygroundComponent implements OnInit {
 
     this.loading.set(true);
     this.response.set(null);
+    const startTime = performance.now();
 
     this.marketplaceService
       .invokeService(
@@ -633,10 +662,74 @@ export class PlaygroundComponent implements OnInit {
         },
         error: (err) => {
           this.loading.set(false);
-          const msg = err.error?.message ?? 'API invocation failed. Ensure your API key is valid.';
+          const latencyMs = Math.round(performance.now() - startTime);
+          const statusCode = err.status || 500;
+          const errorData = (err.error && typeof err.error === 'object')
+            ? err.error
+            : {
+                timestamp: new Date().toISOString(),
+                status: statusCode,
+                error: 'INVOCATION_FAILED',
+                message: err.message || 'API invocation failed.',
+                path: this.selectedEndpoint.trim(),
+              };
+
+          const simulatedErrorResponse: ServiceInvocationResponse = {
+            statusCode: statusCode,
+            latencyMs: latencyMs,
+            serviceName: this.currentService()?.name || 'Gateway',
+            category: this.currentService()?.category || 'SERVICE',
+            timestamp: errorData.timestamp || new Date().toISOString(),
+            responseData: errorData,
+            metrics: {
+              tokensUsed: 0,
+              rateLimitRemaining: 0,
+              rateLimitLimit: this.currentService()?.rateLimitPerMinute ?? 60,
+              serviceTier: this.currentService()?.pricingTier || 'Standard',
+              error: errorData.error || 'GATEWAY_POLICY_VIOLATION',
+            },
+          };
+          this.response.set(simulatedErrorResponse);
+
+          const msg = errorData.message ?? 'API invocation failed. Ensure your API key is valid.';
           this.snackBar.open(msg, 'Dismiss', { duration: 4000 });
         },
       });
+  }
+
+  isSuccessStatus(code?: number): boolean {
+    return !!code && code >= 200 && code < 300;
+  }
+
+  isErrorStatus(code?: number): boolean {
+    return !code || code >= 400;
+  }
+
+  getStatusIcon(code?: number): string {
+    if (!code) return 'help_outline';
+    if (code >= 200 && code < 300) return 'check_circle';
+    if (code === 403) return 'shield';
+    if (code === 404) return 'search_off';
+    if (code === 405) return 'do_not_disturb';
+    if (code === 429) return 'speed';
+    return 'cancel';
+  }
+
+  getStatusLabel(code?: number): string {
+    if (!code) return 'UNKNOWN';
+    switch (code) {
+      case 200: return '200 OK';
+      case 201: return '201 Created';
+      case 400: return '400 Bad Request';
+      case 401: return '401 Unauthorized';
+      case 403: return '403 Forbidden';
+      case 404: return '404 Not Found';
+      case 405: return '405 Method Not Offered';
+      case 409: return '409 Conflict';
+      case 429: return '429 Rate Limit Exceeded';
+      case 500: return '500 Gateway Error';
+      default: return `${code} Error`;
+    }
   }
 
   copyResponse(): void {
