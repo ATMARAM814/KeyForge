@@ -69,14 +69,14 @@ export class MarketplaceService {
   }
 
   getProviderRateLimitRequests(): Observable<ApiKey[]> {
-    return this.http.get<ApiKey[]>(`${this.baseUrl}/provider/rate-limit-requests`);
+    return this.http.get<ApiKey[]>(`${environment.apiBaseUrl}/marketplace/provider/rate-limit-requests`);
   }
 
   approveRateLimitRequest(keyId: string): Observable<ApiKey> {
-    return this.http.post<ApiKey>(`${this.baseUrl}/provider/rate-limit-requests/${keyId}/approve`, {});
+    return this.http.post<ApiKey>(`${environment.apiBaseUrl}/marketplace/provider/rate-limit-requests/${keyId}/approve`, {});
   }
 
   rejectRateLimitRequest(keyId: string): Observable<ApiKey> {
-    return this.http.post<ApiKey>(`${this.baseUrl}/provider/rate-limit-requests/${keyId}/reject`, {});
+    return this.http.post<ApiKey>(`${environment.apiBaseUrl}/marketplace/provider/rate-limit-requests/${keyId}/reject`, {});
   }
 }

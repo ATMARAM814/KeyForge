@@ -15,6 +15,11 @@ public interface OrganizationMembershipRepository extends JpaRepository<Organiza
             "where m.user.id = :userId")
     List<OrganizationMembership> findAllByUserIdWithOrganization(@Param("userId") String userId);
 
+    @Query("select m from OrganizationMembership m " +
+            "join fetch m.organization " +
+            "where m.user.id = :userId")
+    List<OrganizationMembership> findAllByUserId(@Param("userId") String userId);
+
     Optional<OrganizationMembership> findByUserIdAndOrganizationId(String userId, String organizationId);
 
     boolean existsByUserIdAndOrganizationId(String userId, String organizationId);

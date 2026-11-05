@@ -15,7 +15,11 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, String> {
 
     Page<ApiKey> findAllByProjectId(String projectId, Pageable pageable);
 
+    Page<ApiKey> findAllByProjectIdOrderByCreatedAtDesc(String projectId, Pageable pageable);
+
     List<ApiKey> findAllByProjectId(String projectId);
+
+    List<ApiKey> findAllByProjectIdOrderByCreatedAtDesc(String projectId);
 
     /**
      * Looks up candidate keys sharing a visible prefix. Prefixes are NOT unique

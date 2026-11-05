@@ -85,7 +85,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
               </td>
             </ng-container>
 
-            <tr mat-header-row *matRowDef="displayedColumns"></tr>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
           </table>
 

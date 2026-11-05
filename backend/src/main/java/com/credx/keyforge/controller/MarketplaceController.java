@@ -71,17 +71,17 @@ public class MarketplaceController {
         return ResponseEntity.ok(serviceListingService.getMySubscribedKeys());
     }
 
-    @GetMapping("/provider/rate-limit-requests")
+    @GetMapping({"/provider/rate-limit-requests", "/services/provider/rate-limit-requests"})
     public ResponseEntity<List<ApiKeyResponse>> getProviderRateLimitRequests() {
         return ResponseEntity.ok(serviceListingService.getProviderRateLimitRequests());
     }
 
-    @PostMapping("/provider/rate-limit-requests/{keyId}/approve")
+    @PostMapping({"/provider/rate-limit-requests/{keyId}/approve", "/services/provider/rate-limit-requests/{keyId}/approve"})
     public ResponseEntity<ApiKeyResponse> approveRateLimitRequest(@PathVariable String keyId) {
         return ResponseEntity.ok(serviceListingService.approveRateLimitRequest(keyId));
     }
 
-    @PostMapping("/provider/rate-limit-requests/{keyId}/reject")
+    @PostMapping({"/provider/rate-limit-requests/{keyId}/reject", "/services/provider/rate-limit-requests/{keyId}/reject"})
     public ResponseEntity<ApiKeyResponse> rejectRateLimitRequest(@PathVariable String keyId) {
         return ResponseEntity.ok(serviceListingService.rejectRateLimitRequest(keyId));
     }
