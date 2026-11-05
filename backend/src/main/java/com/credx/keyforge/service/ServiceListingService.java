@@ -269,11 +269,15 @@ public class ServiceListingService {
             approvalStatus = "PENDING_APPROVAL";
         }
 
-        // 4. Allowed Endpoints
+        // 4. Allowed Endpoints (validated against provider's declared endpoints)
         String allowedEndpointsJson = null;
         if (request != null && request.allowedEndpoints() != null && !request.allowedEndpoints().isEmpty()) {
+            List<DeclaredEndpointPermission> validated = filterAllowedEndpointsAgainstProvider(
+                    request.allowedEndpoints(),
+                    service.getDeclaredEndpoints()
+            );
             try {
-                allowedEndpointsJson = objectMapper.writeValueAsString(request.allowedEndpoints());
+                allowedEndpointsJson = objectMapper.writeValueAsString(validated);
             } catch (Exception ignored) {}
         }
 
@@ -645,5 +649,54 @@ public class ServiceListingService {
         } catch (Exception e) {
             return "[]";
         }
+    }
+
+    public List<DeclaredEndpointPermission> filterAllowedEndpointsAgainstProvider(
+            List<DeclaredEndpointPermission> requested,
+            String providerEndpointsJson
+    ) {
+        if (requested == null || requested.isEmpty()) return Collections.emptyList();
+        if (providerEndpointsJson == null || providerEndpointsJson.isBlank() || providerEndpointsJson.equals("*")) {
+            return requested;
+        }
+
+        List<DeclaredEndpointPermission> providerEndpoints;
+        try {
+            providerEndpoints = objectMapper.readValue(providerEndpointsJson, new TypeReference<List<DeclaredEndpointPermission>>() {});
+        } catch (Exception e) {
+            return requested;
+        }
+
+        List<DeclaredEndpointPermission> filtered = new ArrayList<>();
+        for (DeclaredEndpointPermission req : requested) {
+            if (req.endpoint() == null || req.endpoint().isBlank()) continue;
+            List<String> allowedMethods = new ArrayList<>();
+            for (DeclaredEndpointPermission prov : providerEndpoints) {
+                if (prov.endpoint() != null && prov.endpoint().equalsIgnoreCase(req.endpoint())) {
+                    if (prov.methods() == null || prov.methods().isEmpty() || prov.methods().contains("*") || prov.methods().contains("ALL")) {
+                        if (req.methods() != null) {
+                            for (String m : req.methods()) {
+                                String clean = m.trim().toUpperCase();
+                                if (!allowedMethods.contains(clean)) allowedMethods.add(clean);
+                            }
+                        }
+                    } else {
+                        if (req.methods() != null) {
+                            for (String m : req.methods()) {
+                                String clean = m.trim().toUpperCase();
+                                if (prov.methods().stream().anyMatch(pm -> pm.equalsIgnoreCase(clean))) {
+                                    if (!allowedMethods.contains(clean)) allowedMethods.add(clean);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            if (!allowedMethods.isEmpty()) {
+                filtered.add(new DeclaredEndpointPermission(req.endpoint(), allowedMethods));
+            }
+        }
+        return filtered.isEmpty() ? requested : filtered;
     }
 }

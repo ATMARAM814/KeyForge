@@ -142,17 +142,19 @@ public class GatewayEnforcementService {
         }
 
         // 3. Two-Tier Endpoints & Capabilities Enforcement
-        // Tier 1: Check if the Model Provider actually declared and offers this endpoint route
+        // Tier 1: Check if the Model Provider actually declared and offers this endpoint route & method
         if (apiKey.getServiceListing() != null && apiKey.getServiceListing().getDeclaredEndpoints() != null && !apiKey.getServiceListing().getDeclaredEndpoints().isBlank() && targetPath != null) {
             boolean offeredByProvider = isEndpointPermitted(targetPath, httpMethod, apiKey.getServiceListing().getDeclaredEndpoints());
             if (!offeredByProvider) {
-                // If route path is offered by provider and method is GET/HEAD (read/schema check) or permitted by key, route is valid
                 boolean routePathOffered = isRoutePathDeclared(targetPath, apiKey.getServiceListing().getDeclaredEndpoints());
                 if (!routePathOffered) {
                     return EnforcementResult.denied(404, "ENDPOINT_NOT_OFFERED",
-                            "The target endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "] is not offered by the model provider",
-                            70, List.of("Endpoint not offered by provider: " + httpMethod + " " + targetPath));
+                            "The target endpoint route [" + targetPath + "] is not offered by the model provider",
+                            70, List.of("Endpoint route not offered by provider: " + targetPath));
                 }
+                return EnforcementResult.denied(405, "METHOD_NOT_OFFERED",
+                        "The target endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "] is not offered by the model provider",
+                        70, List.of("Method not offered by provider: " + httpMethod + " " + targetPath));
             }
         }
 
@@ -161,7 +163,7 @@ public class GatewayEnforcementService {
             boolean endpointAllowed = isEndpointPermitted(targetPath, httpMethod, apiKey.getAllowedEndpoints());
             if (!endpointAllowed) {
                 return EnforcementResult.denied(403, "ENDPOINT_NOT_ALLOWED",
-                        "The API key is not permitted to access endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "]",
+                        "The API key is not permitted to access endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "]. Only permissions selected during key creation are allowed.",
                         60, List.of("Forbidden endpoint accessed: " + httpMethod + " " + targetPath));
             }
         }

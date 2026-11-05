@@ -20,8 +20,10 @@ interface EndpointModelOption {
   name: string;
   supportsRead?: boolean;
   supportsWrite: boolean;
+  supportsDelete?: boolean;
   readSelected: boolean;
   writeSelected: boolean;
+  deleteSelected?: boolean;
 }
 
 @Component({
@@ -440,6 +442,12 @@ interface EndpointModelOption {
                                   <label class="kf-method-tag">
                                     <input type="checkbox" [(ngModel)]="ep.writeSelected" />
                                     <span>Write (POST/PUT)</span>
+                                  </label>
+                                }
+                                @if (ep.supportsDelete) {
+                                  <label class="kf-method-tag">
+                                    <input type="checkbox" [(ngModel)]="ep.deleteSelected" />
+                                    <span>Delete (DELETE)</span>
                                   </label>
                                 }
                               </div>
@@ -1451,14 +1459,17 @@ export class SubscribePageComponent implements OnInit {
           this.endpointOptions = item.declaredEndpoints.map((ep) => {
             const hasMethods = ep.methods && ep.methods.length > 0;
             const supportsRead = hasMethods ? ep.methods.some((m) => m === 'GET' || m === '*' || m === 'ALL') : true;
-            const supportsWrite = hasMethods ? ep.methods.some((m) => m === 'POST' || m === 'PUT' || m === 'DELETE' || m === '*' || m === 'ALL') : true;
+            const supportsWrite = hasMethods ? ep.methods.some((m) => m === 'POST' || m === 'PUT' || m === '*' || m === 'ALL') : true;
+            const supportsDelete = hasMethods ? ep.methods.some((m) => m === 'DELETE' || m === '*' || m === 'ALL') : false;
             return {
               endpoint: ep.endpoint,
               name: ep.name || ep.endpoint,
-              supportsRead: supportsRead || !supportsWrite,
-              supportsWrite: supportsWrite || !supportsRead,
+              supportsRead: supportsRead || (!supportsWrite && !supportsDelete),
+              supportsWrite: supportsWrite,
+              supportsDelete: supportsDelete,
               readSelected: supportsRead,
               writeSelected: supportsWrite,
+              deleteSelected: false,
             };
           });
         } else {
@@ -1467,8 +1478,10 @@ export class SubscribePageComponent implements OnInit {
               endpoint: item.endpointUrl || '/v1/chat/completions',
               name: 'Primary Service Endpoint',
               supportsWrite: true,
+              supportsDelete: false,
               readSelected: true,
               writeSelected: true,
+              deleteSelected: false,
             },
           ];
         }
@@ -1599,11 +1612,12 @@ export class SubscribePageComponent implements OnInit {
     }
 
     const allowedEndpoints: DeclaredEndpointPermission[] = this.endpointOptions
-      .filter(ep => ep.readSelected || ep.writeSelected)
+      .filter(ep => ep.readSelected || ep.writeSelected || ep.deleteSelected)
       .map(ep => {
         const methods: string[] = [];
         if (ep.readSelected) methods.push('GET', 'HEAD');
-        if (ep.writeSelected) methods.push('POST', 'PUT', 'DELETE');
+        if (ep.writeSelected) methods.push('POST', 'PUT');
+        if (ep.deleteSelected) methods.push('DELETE');
         return { endpoint: ep.endpoint, methods };
       });
 
