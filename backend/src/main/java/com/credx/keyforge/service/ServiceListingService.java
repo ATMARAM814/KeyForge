@@ -480,7 +480,7 @@ public class ServiceListingService {
                 latency
         );
 
-        Object responseData = buildSimulatedResponse(service, request != null ? request.payload() : null);
+        Object responseData = buildSimulatedResponse(service, request != null ? request.payload() : null, httpMethod, targetPath);
 
         Map<String, Object> metrics = Map.of(
                 "tokensUsed", (int) (Math.random() * 120) + 40,
@@ -502,7 +502,33 @@ public class ServiceListingService {
         );
     }
 
-    private Object buildSimulatedResponse(ServiceListing service, String inputPayload) {
+    private Object buildSimulatedResponse(ServiceListing service, String inputPayload, String httpMethod, String targetPath) {
+        if ("GET".equalsIgnoreCase(httpMethod)) {
+            if (targetPath != null && targetPath.contains("models")) {
+                return Map.of(
+                        "object", "list",
+                        "data", List.of(
+                                Map.of(
+                                        "id", service.getSlug(),
+                                        "object", "model",
+                                        "created", service.getCreatedAt() != null ? service.getCreatedAt().getEpochSecond() : Instant.now().getEpochSecond(),
+                                        "owned_by", service.getProviderName()
+                                )
+                        )
+                );
+            }
+            return Map.of(
+                    "status", "ONLINE",
+                    "endpoint", targetPath != null ? targetPath : service.getEndpointUrl(),
+                    "model", service.getName(),
+                    "category", service.getCategory().name(),
+                    "description", service.getDescription() != null ? service.getDescription() : "Endpoint operational",
+                    "capabilities", List.of("chat_completions", "embeddings", "streaming"),
+                    "supported_methods", List.of("GET", "POST"),
+                    "timestamp", Instant.now().toString()
+            );
+        }
+
         if (service.getSampleResponse() != null && !service.getSampleResponse().isBlank()) {
             try {
                 return objectMapper.readValue(service.getSampleResponse(), new TypeReference<Map<String, Object>>() {});

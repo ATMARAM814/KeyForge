@@ -18,6 +18,7 @@ import { ApiKeyCreatedResponse } from '../../../core/models/api-key.model';
 interface EndpointModelOption {
   endpoint: string;
   name: string;
+  supportsRead?: boolean;
   supportsWrite: boolean;
   readSelected: boolean;
   writeSelected: boolean;
@@ -429,10 +430,12 @@ interface EndpointModelOption {
                                 <span class="kf-ep-name">{{ ep.name }}</span>
                               </div>
                               <div class="kf-ep-methods">
-                                <label class="kf-method-tag">
-                                  <input type="checkbox" [(ngModel)]="ep.readSelected" />
-                                  <span>Read (GET)</span>
-                                </label>
+                                @if (ep.supportsRead !== false) {
+                                  <label class="kf-method-tag">
+                                    <input type="checkbox" [(ngModel)]="ep.readSelected" />
+                                    <span>Read (GET)</span>
+                                  </label>
+                                }
                                 @if (ep.supportsWrite) {
                                   <label class="kf-method-tag">
                                     <input type="checkbox" [(ngModel)]="ep.writeSelected" />
@@ -1445,13 +1448,19 @@ export class SubscribePageComponent implements OnInit {
       next: (item) => {
         this.service.set(item);
         if (item.declaredEndpoints && item.declaredEndpoints.length > 0) {
-          this.endpointOptions = item.declaredEndpoints.map((ep) => ({
-            endpoint: ep.endpoint,
-            name: ep.name || ep.endpoint,
-            supportsWrite: ep.methods ? ep.methods.some((m) => m === 'POST' || m === 'PUT') : true,
-            readSelected: true,
-            writeSelected: true,
-          }));
+          this.endpointOptions = item.declaredEndpoints.map((ep) => {
+            const hasMethods = ep.methods && ep.methods.length > 0;
+            const supportsRead = hasMethods ? ep.methods.some((m) => m === 'GET' || m === '*' || m === 'ALL') : true;
+            const supportsWrite = hasMethods ? ep.methods.some((m) => m === 'POST' || m === 'PUT' || m === 'DELETE' || m === '*' || m === 'ALL') : true;
+            return {
+              endpoint: ep.endpoint,
+              name: ep.name || ep.endpoint,
+              supportsRead: supportsRead || !supportsWrite,
+              supportsWrite: supportsWrite || !supportsRead,
+              readSelected: supportsRead,
+              writeSelected: supportsWrite,
+            };
+          });
         } else {
           this.endpointOptions = [
             {

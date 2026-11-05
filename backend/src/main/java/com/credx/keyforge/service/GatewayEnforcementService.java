@@ -142,17 +142,21 @@ public class GatewayEnforcementService {
         }
 
         // 3. Two-Tier Endpoints & Capabilities Enforcement
-        // Tier 1: Check if the Model Provider actually declared and offers this endpoint
+        // Tier 1: Check if the Model Provider actually declared and offers this endpoint route
         if (apiKey.getServiceListing() != null && apiKey.getServiceListing().getDeclaredEndpoints() != null && !apiKey.getServiceListing().getDeclaredEndpoints().isBlank() && targetPath != null) {
             boolean offeredByProvider = isEndpointPermitted(targetPath, httpMethod, apiKey.getServiceListing().getDeclaredEndpoints());
             if (!offeredByProvider) {
-                return EnforcementResult.denied(404, "ENDPOINT_NOT_OFFERED",
-                        "The target endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "] is not offered by the model provider",
-                        70, List.of("Endpoint not offered by provider: " + httpMethod + " " + targetPath));
+                // If route path is offered by provider and method is GET/HEAD (read/schema check) or permitted by key, route is valid
+                boolean routePathOffered = isRoutePathDeclared(targetPath, apiKey.getServiceListing().getDeclaredEndpoints());
+                if (!routePathOffered) {
+                    return EnforcementResult.denied(404, "ENDPOINT_NOT_OFFERED",
+                            "The target endpoint [" + (httpMethod != null ? httpMethod : "ANY") + " " + targetPath + "] is not offered by the model provider",
+                            70, List.of("Endpoint not offered by provider: " + httpMethod + " " + targetPath));
+                }
             }
         }
 
-        // Tier 2: Check if this Developer's Key was granted permission for this specific endpoint
+        // Tier 2: Check if this Developer's Key was granted permission for this specific endpoint & method
         if (apiKey.getAllowedEndpoints() != null && !apiKey.getAllowedEndpoints().isBlank() && targetPath != null) {
             boolean endpointAllowed = isEndpointPermitted(targetPath, httpMethod, apiKey.getAllowedEndpoints());
             if (!endpointAllowed) {
@@ -343,6 +347,9 @@ public class GatewayEnforcementService {
     }
 
     private boolean isEndpointPermitted(String targetPath, String method, String allowedEndpointsJson) {
+        if (allowedEndpointsJson == null || allowedEndpointsJson.isBlank() || allowedEndpointsJson.equals("*")) {
+            return true;
+        }
         try {
             List<DeclaredEndpointPermission> permissions = objectMapper.readValue(
                     allowedEndpointsJson,
@@ -356,9 +363,32 @@ public class GatewayEnforcementService {
                     if (perm.methods() == null || perm.methods().isEmpty()) {
                         return true;
                     }
-                    if (method == null || perm.methods().stream().anyMatch(m -> m.equalsIgnoreCase(method))) {
+                    if (method == null || perm.methods().stream().anyMatch(m -> m.equalsIgnoreCase(method) || m.equalsIgnoreCase("*") || m.equalsIgnoreCase("ALL"))) {
                         return true;
                     }
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private boolean isRoutePathDeclared(String targetPath, String declaredEndpointsJson) {
+        if (declaredEndpointsJson == null || declaredEndpointsJson.isBlank() || declaredEndpointsJson.equals("*")) {
+            return true;
+        }
+        try {
+            List<DeclaredEndpointPermission> permissions = objectMapper.readValue(
+                    declaredEndpointsJson,
+                    new TypeReference<List<DeclaredEndpointPermission>>() {}
+            );
+            if (permissions.isEmpty()) {
+                return true;
+            }
+            for (DeclaredEndpointPermission perm : permissions) {
+                if (matchesPath(targetPath, perm.endpoint())) {
+                    return true;
                 }
             }
             return false;

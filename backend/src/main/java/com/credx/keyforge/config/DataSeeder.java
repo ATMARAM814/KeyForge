@@ -45,6 +45,7 @@ public class DataSeeder implements CommandLineRunner {
             jdbcTemplate.execute("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS service_id VARCHAR(36)");
             jdbcTemplate.execute("ALTER TABLE service_listings ADD COLUMN IF NOT EXISTS declared_endpoints VARCHAR(3000)");
             jdbcTemplate.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details VARCHAR(1000)");
+            jdbcTemplate.execute("UPDATE service_listings SET declared_endpoints = '[{\"endpoint\":\"/v1/chat/completions\",\"methods\":[\"GET\",\"POST\"]},{\"endpoint\":\"/v1/embeddings\",\"methods\":[\"GET\",\"POST\"]},{\"endpoint\":\"/v1/models\",\"methods\":[\"GET\"]}]' WHERE declared_endpoints LIKE '%/v1/chat/completions%'");
             log.info("Schema verified and updated successfully");
         } catch (Exception e) {
             log.warn("Schema constraint/column update: {}", e.getMessage());

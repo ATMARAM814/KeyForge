@@ -106,6 +106,7 @@ import { DeclaredEndpointPermission, ServiceCategory } from '../../../core/model
             <select class="kf-small-select" [(ngModel)]="newEndpointMethod" [ngModelOptions]="{standalone: true}">
               <option value="POST">POST</option>
               <option value="GET">GET</option>
+              <option value="GET,POST">GET & POST</option>
               <option value="PUT">PUT</option>
               <option value="DELETE">DELETE</option>
             </select>
@@ -358,8 +359,8 @@ export class PublishServiceDialogComponent {
   newEndpointMethod = 'POST';
 
   declaredEndpoints: DeclaredEndpointPermission[] = [
-    { endpoint: '/v1/chat/completions', methods: ['POST'] },
-    { endpoint: '/v1/embeddings', methods: ['POST'] },
+    { endpoint: '/v1/chat/completions', methods: ['POST', 'GET'] },
+    { endpoint: '/v1/embeddings', methods: ['POST', 'GET'] },
     { endpoint: '/v1/models', methods: ['GET'] },
   ];
 
@@ -384,8 +385,8 @@ export class PublishServiceDialogComponent {
     switch (cat) {
       case 'AI_LLM':
         this.declaredEndpoints = [
-          { endpoint: '/v1/chat/completions', methods: ['POST'] },
-          { endpoint: '/v1/embeddings', methods: ['POST'] },
+          { endpoint: '/v1/chat/completions', methods: ['POST', 'GET'] },
+          { endpoint: '/v1/embeddings', methods: ['POST', 'GET'] },
           { endpoint: '/v1/models', methods: ['GET'] },
         ];
         break;
@@ -420,9 +421,12 @@ export class PublishServiceDialogComponent {
     if (!this.newEndpointPath.trim()) return;
     let path = this.newEndpointPath.trim();
     if (!path.startsWith('/')) path = '/' + path;
+    const methods = this.newEndpointMethod.includes(',')
+      ? this.newEndpointMethod.split(',')
+      : [this.newEndpointMethod];
     this.declaredEndpoints.push({
       endpoint: path,
-      methods: [this.newEndpointMethod],
+      methods,
     });
     this.newEndpointPath = '';
   }
