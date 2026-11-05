@@ -534,17 +534,33 @@ public class ServiceListingService {
         }
 
         return switch (service.getCategory()) {
-            case AI_LLM -> Map.of(
-                    "id", "chatcmpl-" + UUID.randomUUID().toString().substring(0, 10),
-                    "model", service.getName(),
-                    "choices", List.of(Map.of(
-                            "message", Map.of(
-                                    "role", "assistant",
-                                    "content", "Inference successful from " + service.getName() + ". Processed payload: " + (inputPayload != null ? inputPayload : "default prompt")
+            case AI_LLM -> {
+                if (targetPath != null && targetPath.contains("embeddings")) {
+                    yield Map.of(
+                            "object", "list",
+                            "data", List.of(
+                                    Map.of(
+                                            "object", "embedding",
+                                            "index", 0,
+                                            "embedding", List.of(0.0023, -0.0124, 0.0451, 0.0098, -0.0312, 0.0815, -0.0042, 0.0195)
+                                    )
                             ),
-                            "finish_reason", "stop"
-                    ))
-            );
+                            "model", service.getName(),
+                            "usage", Map.of("prompt_tokens", 8, "total_tokens", 8)
+                    );
+                }
+                yield Map.of(
+                        "id", "chatcmpl-" + UUID.randomUUID().toString().substring(0, 10),
+                        "model", service.getName(),
+                        "choices", List.of(Map.of(
+                                "message", Map.of(
+                                        "role", "assistant",
+                                        "content", "Inference successful from " + service.getName() + ". Processed payload: " + (inputPayload != null ? inputPayload : "default prompt")
+                                ),
+                                "finish_reason", "stop"
+                        ))
+                );
+            }
             case COMPUTER_VISION -> Map.of(
                     "model", service.getName(),
                     "detections", List.of(

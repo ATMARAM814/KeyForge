@@ -401,6 +401,9 @@ public class GatewayEnforcementService {
         if (pattern == null || pattern.equals("*") || pattern.equals("/*")) {
             return true;
         }
+        if (requestPath == null || requestPath.isBlank()) {
+            return false;
+        }
         String cleanReq = requestPath.trim();
         String cleanPat = pattern.trim();
         if (cleanReq.equalsIgnoreCase(cleanPat)) {
@@ -410,6 +413,26 @@ public class GatewayEnforcementService {
             String prefix = cleanPat.substring(0, cleanPat.length() - 2);
             return cleanReq.startsWith(prefix);
         }
+
+        // Smart route matching: accommodate path prefixes (e.g. /v1/chat/embeddings matching /v1/embeddings or /embeddings)
+        String reqLast = extractEndpointKey(cleanReq);
+        String patLast = extractEndpointKey(cleanPat);
+        if (!reqLast.isEmpty() && reqLast.equalsIgnoreCase(patLast)) {
+            return true;
+        }
+
         return cleanReq.startsWith(cleanPat);
+    }
+
+    private String extractEndpointKey(String path) {
+        if (path == null) return "";
+        String[] parts = path.split("/");
+        for (int i = parts.length - 1; i >= 0; i--) {
+            String p = parts[i].trim().toLowerCase();
+            if (!p.isEmpty() && !p.equals("v1") && !p.equals("v2") && !p.equals("api")) {
+                return p;
+            }
+        }
+        return "";
     }
 }

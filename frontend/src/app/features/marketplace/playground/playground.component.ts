@@ -69,6 +69,25 @@ import { DeclaredEndpointPermission, ServiceInvocationResponse, ServiceListing }
             </div>
           }
 
+          @if (availableEndpoints.length > 0) {
+            <div class="kf-quick-routes">
+              <span class="kf-quick-routes-label">Available Endpoints:</span>
+              <div class="kf-routes-pills">
+                @for (ep of availableEndpoints; track ep.endpoint) {
+                  <button
+                    type="button"
+                    class="kf-route-pill-btn"
+                    [class.kf-route-pill-btn--active]="selectedEndpoint === ep.endpoint"
+                    (click)="selectRoute(ep)"
+                  >
+                    <span class="kf-route-method-tag">{{ ep.methods[0] || 'POST' }}</span>
+                    <span class="kf-route-path-text">{{ ep.endpoint }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           <div class="kf-endpoint-selector-row">
             <mat-form-field appearance="outline" class="kf-method-field">
               <mat-label>Method</mat-label>
@@ -303,7 +322,72 @@ import { DeclaredEndpointPermission, ServiceInvocationResponse, ServiceListing }
       border: 1px solid #e2e8f0;
       padding: 8px 12px;
       border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .kf-quick-routes {
       margin-bottom: 16px;
+    }
+
+    .kf-quick-routes-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    .kf-routes-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .kf-route-pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #334155;
+    }
+
+    .kf-route-pill-btn:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
+    }
+
+    .kf-route-pill-btn--active {
+      background: #eef2ff !important;
+      border-color: #6366f1 !important;
+      color: #4f46e5 !important;
+      font-weight: 600;
+    }
+
+    .kf-route-method-tag {
+      font-size: 10px;
+      font-weight: 800;
+      background: #ffffff;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .kf-route-pill-btn--active .kf-route-method-tag {
+      background: #4f46e5;
+      color: #ffffff;
+      border-color: #4f46e5;
+    }
+
+    .kf-route-path-text {
+      font-family: monospace;
     }
 
     .kf-pill-badge {
@@ -477,21 +561,49 @@ export class PlaygroundComponent implements OnInit {
     });
   }
 
+  get availableEndpoints(): DeclaredEndpointPermission[] {
+    const svc = this.currentService();
+    if (svc && svc.declaredEndpoints && svc.declaredEndpoints.length > 0) {
+      return svc.declaredEndpoints;
+    }
+    return [
+      { endpoint: '/v1/chat/completions', methods: ['POST', 'GET'] },
+      { endpoint: '/v1/embeddings', methods: ['POST', 'GET'] },
+      { endpoint: '/v1/models', methods: ['GET'] },
+    ];
+  }
+
+  selectRoute(ep: DeclaredEndpointPermission): void {
+    this.selectedEndpoint = ep.endpoint;
+    if (ep.methods && ep.methods.length > 0) {
+      this.selectedMethod = ep.methods.includes('POST') ? 'POST' : ep.methods[0];
+    } else {
+      this.selectedMethod = 'POST';
+    }
+
+    if (ep.endpoint.includes('embeddings')) {
+      this.payloadText = JSON.stringify({ input: 'Sample text to generate vector embeddings' }, null, 2);
+    } else if (ep.endpoint.includes('models')) {
+      this.payloadText = '';
+      this.selectedMethod = 'GET';
+    } else if (ep.endpoint.includes('chat') || ep.endpoint.includes('completions')) {
+      this.payloadText = JSON.stringify({
+        model: this.currentService()?.name || 'mistral-7b',
+        messages: [{ role: 'user', content: 'Hello world' }]
+      }, null, 2);
+    }
+  }
+
   onServiceChange(): void {
     const svc = this.services().find((s) => s.id === this.selectedServiceId) ?? null;
     this.currentService.set(svc);
     if (svc) {
       if (svc.declaredEndpoints && svc.declaredEndpoints.length > 0) {
-        this.selectedEndpoint = svc.declaredEndpoints[0].endpoint;
-        this.selectedMethod = svc.declaredEndpoints[0].methods?.[0] || 'POST';
+        this.selectRoute(svc.declaredEndpoints[0]);
       } else if (svc.endpointUrl) {
         this.selectedEndpoint = svc.endpointUrl;
-      }
-
-      if (svc.samplePayload) {
-        this.payloadText = svc.samplePayload;
-      } else {
-        this.payloadText = '{\n  "prompt": "Hello world"\n}';
+        this.selectedMethod = 'POST';
+        this.payloadText = svc.samplePayload || '{\n  "prompt": "Hello world"\n}';
       }
     }
     this.response.set(null);
